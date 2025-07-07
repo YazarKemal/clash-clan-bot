@@ -653,8 +653,8 @@ Hoş geldin {first_name}! ⚔️
                 self.users[user_id]['coc_tag'] = text
                 self.send_message(chat_id, f"✅ **COC tag kaydedildi!**\n🏷️ **Tag:** `{text}`")
                 self.save_data()
-        elif text == 'APITEST':
-            self.handle_api_test_command(message)
+        elif text == 'IPCHECK':
+            self.handle_ip_check_command(message)
         else:
             # Küfür kontrolü
             self.check_profanity(message)
@@ -757,6 +757,69 @@ Hoş geldin {first_name}! ⚔️
             
             if not any([total_warnings > 10, analyses and avg_inactive > 5, total_active < 20]):
                 text += "\n🎉 Her şey yolunda gidiyor!"
+        
+        self.send_message(chat_id, text)
+    
+    def handle_ip_check_command(self, message):
+        """IP değişiklik kontrolü"""
+        chat_id = message['chat']['id']
+        user_id = str(message['from']['id'])
+        
+        if user_id not in ADMIN_USERS:
+            text = "❌ Bu komut sadece adminler için!"
+            self.send_message(chat_id, text)
+            return
+        
+        try:
+            # Şu anki IP'yi al
+            current_ip = requests.get('https://httpbin.org/ip', timeout=5).json()['origin']
+            
+            # Token'dan kayıtlı IP'yi çıkar (JWT decode etmeden basit kontrol)
+            token_info = COC_API_TOKEN.split('.')[1] + '=='  # Padding ekle
+            import base64
+            try:
+                decoded = base64.b64decode(token_info)
+                token_text = decoded.decode('utf-8')
+                
+                # IP bilgisini bul
+                if '208.77.244.76' in token_text:
+                    registered_ip = '208.77.244.76'
+                elif '208.77.244.83' in token_text:
+                    registered_ip = '208.77.244.83'
+                elif '208.77.244.10' in token_text:
+                    registered_ip = '208.77.244.10'
+                else:
+                    registered_ip = 'Bulunamadı'
+            except:
+                registered_ip = 'Parse edilemedi'
+            
+            text = f"""🌐 **IP Durum Kontrolü**
+
+📍 **Şu anki IP:** `{current_ip}`
+🔑 **API'de kayıtlı:** `{registered_ip}`
+
+"""
+            
+            if current_ip == registered_ip:
+                text += """✅ **IP EŞLEŞİYOR!**
+🎯 API çalışması normal
+
+🧪 Test: `APITEST` komutunu deneyin"""
+            else:
+                text += f"""❌ **IP DEĞİŞMİŞ!**
+🔄 Yeni IP: {current_ip}
+🔒 Eski IP: {registered_ip}
+
+🛠️ **YAPMANIZ GEREKENLER:**
+1. developer.clashofclans.com'a gidin
+2. Yeni API key oluşturun
+3. IP: `{current_ip}` yazın
+4. Yeni token'ı bana gönderin
+
+⚡ **Otomatik çözüm geliştirilecek!**"""
+            
+        except Exception as e:
+            text = f"❌ **IP kontrol hatası:** {str(e)}"
         
         self.send_message(chat_id, text)
     
