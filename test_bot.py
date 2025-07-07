@@ -6,19 +6,28 @@ import asyncio
 import threading
 from datetime import datetime, timedelta
 
-# IP adresini öğren ve yazdır
-try:
-    ip = requests.get('https://httpbin.org/ip', timeout=5).json()['origin']
-    print(f"🌐 Bot IP adresi: {ip}")
-except:
-    print("IP bulunamadı")
+# Environment variables'dan güvenli token alma
+BOT_TOKEN = os.getenv('BOT_TOKEN', '7341092014:AAFegDvTd2ozU7fWMoyxriJuCn5wqkypvaY')
+COC_API_TOKEN = os.getenv('COC_API_TOKEN', 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiIsImtpZCI6IjI4YTMxOGY3LTAwMDAtYTFlYi03ZmExLTJjNzQzM2M2Y2NhNSJ9.eyJpc3MiOiJzdXBlcmNlbGwiLCJhdWQiOiJzdXBlcmNlbGw6Z2FtZWFwaSIsImp0aSI6ImQ1MTllMTEwLWM4MzAtNDM5NS04MWY4LTNhNzZhYjJkYTcyNCIsImlhdCI6MTc1MTkwNDcwNCwic3ViIjoiZGV2ZWxvcGVyLzRiYTU2MTc5LWE5NDgtMTBkYy0yNmI1LThkZjc5NjcyYjRmNCIsInNjb3BlcyI6WyJjbGFzaCJdLCJsaW1pdHMiOlt7InRpZXIiOiJkZXZlbG9wZXIvc2lsdmVyIiwidHlwZSI6InRocm90dGxpbmcifSx7ImNpZHJzIjpbIjUyLjU3LjMzLjE3NyJdLCJ0eXBlIjoiY2xpZW50In1dfQ.dcqnnRf5sGmim0q55BSOquP9ZmRQ0aKvxqap7aZtpaCxcgyNKK-O9f5JjH3uIQj8JMljBdzujzXZeojMf4H5KA')
 
-# Bot ayarları
-BOT_TOKEN = "7341092014:AAFegDvTd2ozU7fWMoyxriJuCn5wqkypvaY"
-ADMIN_USERS = ["8114999904"]
-COC_API_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiIsImtpZCI6IjI4YTMxOGY3LTAwMDatYTFlYi03ZmExLTJjNzQzM2M2Y2NhNSJ9.eyJpc3MiOiJzdXBlcmNlbGwiLCJhdWQiOiJzdXBlcmNlbGw6Z2FtZWFwaSIsImp0aSI6IjZiYTE1MTdmLTE4YWItNDFhMS1iZTA3LTUxMzMyN2Q0ZTk3YyIsImlhdCI6MTc1MTg1NDIzOSwic3ViIjoiZGV2ZWxvcGVyLzRiYTU2MTc5LWE5NDgt MTBkYy0yNmI1LThkZjc5NjcyYjRmNCIsInNjb3BlcyI6WyJjbGFzaCJdLCJsaW1pdHMiOlt7InRpZXIiOiJkZXZlbG9wZXIvc2lsdmVyIiwidHlwZSI6InRocm90dGxpbmcifSx7ImNpZHJzIjpbIjIwOC43Ny4yNDQuODMiXSwidHlwZSI6ImNsaWVudCJ9XX0.vsBXveIRmpkw_PFbMWCwOLs4sPUQEeRanIMVL3Ozpg94x7YJSv2YxB_MCbmppVZWhoUBlPR0L8hC9zhTa69m5A"
-CLAN_TAG = "#2RGC8UPYV"
+# Diğer ayarlar
+ADMIN_USERS = os.getenv('ADMIN_USERS', '8114999904').split(',')
+CLAN_TAG = os.getenv('CLAN_TAG', '#2RGC8UPYV')
 COC_API_BASE = "https://api.clashofclans.com/v1"
+
+# AWS Lambda uyumluluğu için
+RUNNING_ON_AWS = os.getenv('AWS_EXECUTION_ENV') is not None
+DATA_PATH = '/tmp/' if RUNNING_ON_AWS else './'
+
+# IP adresini öğren ve yazdır
+def get_current_ip():
+    try:
+        ip = requests.get('https://httpbin.org/ip', timeout=5).json()['origin']
+        print(f"🌐 Bot IP adresi: {ip}")
+        return ip
+    except Exception as e:
+        print(f"IP bulunamadı: {e}")
+        return None
 
 # Rütbe sistemı
 ROLE_HIERARCHY = {
@@ -42,17 +51,22 @@ class AutoClanManager:
     def __init__(self):
         self.base_url = f"https://api.telegram.org/bot{BOT_TOKEN}"
         self.offset = 0
-        self.data_file = "clan_data.json"
+        self.data_file = os.path.join(DATA_PATH, "clan_data.json")
         self.load_data()
         self.today = datetime.now().strftime('%Y-%m-%d')
         self.last_clan_check = None
+        self.current_ip = get_current_ip()
+        
         print(f"✅ Bot başlatıldı - Tarih: {self.today}")
+        print(f"🔧 AWS Mode: {'✓' if RUNNING_ON_AWS else '✗'}")
+        print(f"📁 Data Path: {DATA_PATH}")
         
         # İlk klan analizi
         self.analyze_clan()
         
-        # Otomatik klan kontrolü başlat (her saat)
-        self.start_auto_clan_monitoring()
+        # AWS Lambda'da otomatik monitoring'i başlatma (event-driven)
+        if not RUNNING_ON_AWS:
+            self.start_auto_clan_monitoring()
         
     def load_data(self):
         """Kalıcı verileri dosyadan yükle"""
@@ -65,7 +79,8 @@ class AutoClanManager:
                     self.warnings_data = data.get('warnings_data', {})
                     self.clan_history = data.get('clan_history', {})
                     print(f"✅ {len(self.users)} kullanıcı verisi yüklendi")
-            except:
+            except Exception as e:
+                print(f"⚠️ Veri yükleme hatası: {e}")
                 self.reset_data()
         else:
             self.reset_data()
@@ -85,10 +100,18 @@ class AutoClanManager:
             'daily_stats': self.daily_stats,
             'warnings_data': self.warnings_data,
             'clan_history': self.clan_history,
-            'last_save': datetime.now().isoformat()
+            'last_save': datetime.now().isoformat(),
+            'bot_info': {
+                'ip': self.current_ip,
+                'aws_mode': RUNNING_ON_AWS,
+                'version': '2.0'
+            }
         }
         
         try:
+            # AWS'de /tmp dizini kullan
+            os.makedirs(os.path.dirname(self.data_file), exist_ok=True)
+            
             with open(self.data_file, 'w', encoding='utf-8') as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
             print("💾 Veriler kaydedildi")
@@ -111,6 +134,11 @@ class AutoClanManager:
                 clan_data = response.json()
                 print(f"✅ Klan verisi alındı: {clan_data['name']}")
                 return clan_data
+            elif response.status_code == 403:
+                print(f"❌ COC API Yetki Hatası: IP değişmiş olabilir ({self.current_ip})")
+                # IP değişikliğini bildir
+                self.notify_ip_change()
+                return None
             else:
                 print(f"❌ COC API Hatası: {response.status_code}")
                 return None
@@ -118,6 +146,32 @@ class AutoClanManager:
         except Exception as e:
             print(f"❌ COC API Bağlantı hatası: {e}")
             return None
+    
+    def notify_ip_change(self):
+        """IP değişikliğini adminlere bildir"""
+        if not hasattr(self, '_ip_notified'):
+            for admin_id in ADMIN_USERS:
+                try:
+                    text = f"""🚨 **IP DEĞİŞİKLİĞİ TESPİT EDİLDİ!**
+                    
+🌐 **Yeni IP:** {self.current_ip}
+🔑 **Mevcut token:** 52.57.33.177 için yapılandırılmış
+
+🛠️ **YAPMANIZ GEREKENLER:**
+1. developer.clashofclans.com'a gidin
+2. Yeni API key oluşturun  
+3. IP olarak `{self.current_ip}` girin
+4. Yeni token'ı environment variable olarak güncelleyin
+
+⚡ **AWS'de:**
+```
+COC_API_TOKEN=yeni_token_buraya
+```"""
+                    
+                    self.send_message(admin_id, text)
+                except:
+                    pass
+            self._ip_notified = True
     
     def get_clan_war_data(self):
         """Klan savaşı verilerini çek"""
@@ -219,7 +273,7 @@ class AutoClanManager:
         
         if not clan_data:
             print("❌ Klan verisi alınamadı")
-            return
+            return None
         
         analysis_time = datetime.now().isoformat()
         
@@ -299,7 +353,7 @@ class AutoClanManager:
         return analysis
     
     def start_auto_clan_monitoring(self):
-        """Otomatik klan izleme başlat"""
+        """Otomatik klan izleme başlat (sadece EC2/local için)"""
         def monitor_loop():
             while True:
                 try:
@@ -389,6 +443,8 @@ class AutoClanManager:
         # Klan durumu özeti
         clan_summary = self.get_clan_summary()
         
+        aws_info = f"\n🌐 **AWS Deploy:** {'✅ Aktif' if RUNNING_ON_AWS else '❌ Local'}" if user_id in ADMIN_USERS else ""
+        
         text = f"""🏰 **Kemal'in Değneği - Otomatik Klan Yöneticisi**
 
 Hoş geldin {first_name}! ⚔️
@@ -397,7 +453,7 @@ Hoş geldin {first_name}! ⚔️
 • 🔄 Saatlik klan analizi
 • 👑 Otomatik rütbe önerileri  
 • ⚠️ Pasif üye tespiti
-• 📊 Gerçek zamanlı istatistikler
+• 📊 Gerçek zamanlı istatistikler{aws_info}
 
 {clan_summary}
 
@@ -406,8 +462,8 @@ Hoş geldin {first_name}! ⚔️
 • **ANALIZ** - Son analiz raporu
 • **RUTBE** - Rütbe önerileri
 • **PASIF** - Pasif üyeler
-• **GUNLUK** - Günlük rapor
-• **HAFTALIK** - Haftalık analiz"""
+• **STATS** - Kişisel istatistik
+• **IPCHECK** - IP kontrol (admin)"""
         
         self.send_message(chat_id, text)
         self.save_data()
@@ -613,295 +669,6 @@ Hoş geldin {first_name}! ⚔️
         
         self.send_message(chat_id, text)
     
-    def handle_text_message(self, message):
-        """Metin mesajlarını işle"""
-        user_id = str(message['from']['id'])
-        chat_id = message['chat']['id']
-        text = message['text'].upper()
-        
-        # Günlük mesaj sayısını artır
-        if self.today not in self.daily_stats:
-            self.daily_stats[self.today] = {
-                'active_users': [],
-                'new_registrations': [],
-                'warnings_given': 0,
-                'total_messages': 0,
-                'start_time': datetime.now().isoformat()
-            }
-        
-        self.daily_stats[self.today]['total_messages'] += 1
-        
-        if text == '/START' or text == 'START':
-            self.handle_start(message)
-        elif text == 'KLAN':
-            self.handle_klan_command(message)
-        elif text == 'ANALIZ':
-            self.handle_analiz_command(message)
-        elif text == 'RUTBE':
-            self.handle_rutbe_command(message)
-        elif text == 'PASIF':
-            self.handle_pasif_command(message)
-        elif text == 'GUNLUK':
-            self.handle_gunluk_command(message)
-        elif text == 'HAFTALIK':
-            self.handle_haftalik_command(message)
-        elif text == 'COC':
-            self.send_message(chat_id, "🏰 **COC Tag'inizi yazın:**\n📋 Örnek: #ABC123XYZ")
-        elif text.startswith('#') and len(text) >= 4:
-            # COC tag kaydet
-            if user_id in self.users:
-                self.users[user_id]['coc_tag'] = text
-                self.send_message(chat_id, f"✅ **COC tag kaydedildi!**\n🏷️ **Tag:** `{text}`")
-                self.save_data()
-        elif text == 'IPCHECK':
-            self.handle_ip_check_command(message)
-        else:
-            # Küfür kontrolü
-            self.check_profanity(message)
-    
-    def handle_gunluk_command(self, message):
-        """Günlük rapor komutu"""
-        chat_id = message['chat']['id']
-        user_id = str(message['from']['id'])
-        
-        if user_id not in ADMIN_USERS:
-            text = "❌ Bu komut sadece adminler için!"
-        else:
-            today_data = self.daily_stats.get(self.today, {})
-            analysis = self.get_latest_clan_analysis()
-            
-            text = f"""📊 **Günlük Detaylı Rapor - {self.today}**
-
-🤖 **Otomatik Klan Analizi:**"""
-            
-            if analysis:
-                clan_info = analysis['clan_info']
-                text += f"""
-🏰 {clan_info['name']} - {clan_info['members']} üye
-👑 En iyi performans: {len(analysis['top_performers'])} üye
-⚠️ Pasif üye: {len(analysis['inactive_members'])} üye
-🔄 Rütbe önerisi: {len(analysis['role_recommendations'])} üye"""
-            else:
-                text += "\n⏳ İlk analiz bekleniyor..."
-            
-            text += f"""
-
-👥 **Bot Kullanım İstatistikleri:**
-• Toplam aktif: {len(today_data.get('active_users', []))}
-• Yeni kayıt: {len(today_data.get('new_registrations', []))}
-• Toplam mesaj: {today_data.get('total_messages', 0)}
-• Verilen uyarı: {today_data.get('warnings_given', 0)}
-
-🕐 **Başlatma:** {today_data.get('start_time', 'Bilinmiyor')[:16]}"""
-        
-        self.send_message(chat_id, text)
-    
-    def handle_haftalik_command(self, message):
-        """Haftalık analiz komutu"""
-        chat_id = message['chat']['id']
-        user_id = str(message['from']['id'])
-        
-        if user_id not in ADMIN_USERS:
-            text = "❌ Bu komut sadece adminler için!"
-        else:
-            # Son 7 günün analizi
-            last_7_days = []
-            for i in range(7):
-                date = (datetime.now() - timedelta(days=i)).strftime('%Y-%m-%d')
-                last_7_days.append(date)
-            
-            total_active = 0
-            total_warnings = 0
-            total_messages = 0
-            
-            for date in last_7_days:
-                if date in self.daily_stats:
-                    day_data = self.daily_stats[date]
-                    total_active += len(day_data.get('active_users', []))
-                    total_warnings += day_data.get('warnings_given', 0)
-                    total_messages += day_data.get('total_messages', 0)
-            
-            # Klan trend analizi
-            analyses = list(self.clan_history.values())[-7:]  # Son 7 analiz
-            
-            text = f"""📈 **Haftalık Klan Analizi**
-
-🤖 **Otomatik Takip Sonuçları:**"""
-            
-            if analyses:
-                avg_inactive = sum(len(a.get('inactive_members', [])) for a in analyses) / len(analyses)
-                avg_top = sum(len(a.get('top_performers', [])) for a in analyses) / len(analyses)
-                
-                text += f"""
-📊 Ortalama pasif üye: {avg_inactive:.1f}
-🏆 Ortalama en iyi: {avg_top:.1f}
-🔄 Toplam analiz: {len(analyses)}"""
-            
-            text += f"""
-
-👥 **Bot Aktivite (7 gün):**
-• Toplam aktiflik: {total_active}
-• Toplam uyarı: {total_warnings}
-• Toplam mesaj: {total_messages}
-
-🎯 **Öneriler:**"""
-            
-            if total_warnings > 10:
-                text += "\n⚠️ Uyarı sayısı yüksek, kural hatırlatması yapın"
-            
-            if analyses and avg_inactive > 5:
-                text += "\n👥 Pasif üye sayısı yüksek, temizlik gerekli"
-            
-            if total_active < 20:
-                text += "\n📢 Bot kullanımı düşük, üyeleri teşvik edin"
-            
-            if not any([total_warnings > 10, analyses and avg_inactive > 5, total_active < 20]):
-                text += "\n🎉 Her şey yolunda gidiyor!"
-        
-        self.send_message(chat_id, text)
-    
-    def handle_ip_check_command(self, message):
-        """IP değişiklik kontrolü"""
-        chat_id = message['chat']['id']
-        user_id = str(message['from']['id'])
-        
-        if user_id not in ADMIN_USERS:
-            text = "❌ Bu komut sadece adminler için!"
-            self.send_message(chat_id, text)
-            return
-        
-        try:
-            # Şu anki IP'yi al
-            current_ip = requests.get('https://httpbin.org/ip', timeout=5).json()['origin']
-            
-            # Token'dan kayıtlı IP'yi çıkar (JWT decode etmeden basit kontrol)
-            token_info = COC_API_TOKEN.split('.')[1] + '=='  # Padding ekle
-            import base64
-            try:
-                decoded = base64.b64decode(token_info)
-                token_text = decoded.decode('utf-8')
-                
-                # IP bilgisini bul
-                if '208.77.244.76' in token_text:
-                    registered_ip = '208.77.244.76'
-                elif '208.77.244.83' in token_text:
-                    registered_ip = '208.77.244.83'
-                elif '208.77.244.10' in token_text:
-                    registered_ip = '208.77.244.10'
-                else:
-                    registered_ip = 'Bulunamadı'
-            except:
-                registered_ip = 'Parse edilemedi'
-            
-            text = f"""🌐 **IP Durum Kontrolü**
-
-📍 **Şu anki IP:** `{current_ip}`
-🔑 **API'de kayıtlı:** `{registered_ip}`
-
-"""
-            
-            if current_ip == registered_ip:
-                text += """✅ **IP EŞLEŞİYOR!**
-🎯 API çalışması normal
-
-🧪 Test: `APITEST` komutunu deneyin"""
-            else:
-                text += f"""❌ **IP DEĞİŞMİŞ!**
-🔄 Yeni IP: {current_ip}
-🔒 Eski IP: {registered_ip}
-
-🛠️ **YAPMANIZ GEREKENLER:**
-1. developer.clashofclans.com'a gidin
-2. Yeni API key oluşturun
-3. IP: `{current_ip}` yazın
-4. Yeni token'ı bana gönderin
-
-⚡ **Otomatik çözüm geliştirilecek!**"""
-            
-        except Exception as e:
-            text = f"❌ **IP kontrol hatası:** {str(e)}"
-        
-        self.send_message(chat_id, text)
-    
-    def handle_api_test_command(self, message):
-        """API test komutu"""
-        chat_id = message['chat']['id']
-        
-        headers = {
-            'Authorization': f'Bearer {COC_API_TOKEN}',
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
-        }
-        
-        try:
-            # Header'ları yazdır
-            text = f"""🔧 **API Test - Debug Bilgisi**
-
-🔑 **Token (ilk 50 karakter):** {COC_API_TOKEN[:50]}...
-📡 **Headers:** {list(headers.keys())}
-🎯 **Klan Tag:** {CLAN_TAG}
-
-⏳ **API Testi yapılıyor...**
-
-"""
-            
-            # Basit API testi
-            clan_url = f"{COC_API_BASE}/clans/{CLAN_TAG.replace('#', '%23')}"
-            print(f"🌐 API Request: {clan_url}")
-            print(f"🔑 Headers: {headers}")
-            
-            response = requests.get(clan_url, headers=headers, timeout=15)
-            
-            text += f"""📡 **URL:** {clan_url}
-📊 **Status Code:** {response.status_code}
-🕐 **Response Time:** {datetime.now().strftime('%H:%M:%S')}
-
-"""
-            
-            if response.status_code == 200:
-                data = response.json()
-                text += f"""✅ **BAŞARILI!**
-🏰 Klan: {data.get('name', 'Bilinmiyor')}
-👥 Üye: {data.get('members', 0)}
-🌍 Ülke: {data.get('location', {}).get('name', 'Bilinmiyor')}
-📈 Seviye: {data.get('clanLevel', 0)}
-🏆 Puan: {data.get('clanPoints', 0)}"""
-            
-            elif response.status_code == 403:
-                text += f"""❌ **403 FORBIDDEN**
-🔒 Erişim reddedildi
-
-**Debug Bilgisi:**
-• Response: {response.text[:200]}
-• Headers gönderildi: ✓
-• Token uzunluğu: {len(COC_API_TOKEN)} karakter
-
-💡 **Muhtemel sebepler:**
-• API key süresi dolmuş
-• IP adresi değişmiş
-• Rate limit aşıldı"""
-            
-            elif response.status_code == 404:
-                text += f"""❌ **404 NOT FOUND**
-🔍 Klan bulunamadı: {CLAN_TAG}
-
-**Klan tag'inizi kontrol edin:**
-• Doğru yazıldı mı?
-• # işareti var mı?
-• Klan hala mevcut mu?"""
-            
-            else:
-                text += f"""❌ **HATA: {response.status_code}**
-📝 Response: {response.text[:300]}
-🔍 Headers sent: {headers}"""
-                
-        except Exception as e:
-            text = f"""❌ **Bağlantı Hatası:**
-🚫 Error: {str(e)}
-🌐 URL: {clan_url if 'clan_url' in locals() else 'N/A'}"""
-        
-        self.send_message(chat_id, text)
-    
     def handle_stats_command(self, message):
         """İstatistik komutu"""
         user_id = str(message['from']['id'])
@@ -956,6 +723,99 @@ Hoş geldin {first_name}! ⚔️
         
         self.send_message(chat_id, text)
     
+    def handle_ipcheck_command(self, message):
+        """IP kontrol komutu"""
+        chat_id = message['chat']['id']
+        user_id = str(message['from']['id'])
+        
+        if user_id not in ADMIN_USERS:
+            text = "❌ Bu komut sadece adminler için!"
+            self.send_message(chat_id, text)
+            return
+        
+        try:
+            # Şu anki IP'yi al
+            current_ip = get_current_ip() or "Bulunamadı"
+            
+            # Token'dan kayıtlı IP'yi çıkar
+            registered_ip = "52.57.33.177"  # Yeni token'da kayıtlı IP
+            
+            text = f"""🌐 **IP Durum Kontrolü**
+
+📍 **Şu anki IP:** `{current_ip}`
+🔑 **API'de kayıtlı:** `{registered_ip}`
+
+"""
+            
+            if current_ip == registered_ip:
+                text += """✅ **IP EŞLEŞİYOR!**
+🎯 API çalışması normal
+
+🧪 Test için: **KLAN** komutunu deneyin"""
+            else:
+                text += f"""❌ **IP DEĞİŞMİŞ!**
+🔄 Yeni IP: {current_ip}
+🔒 Eski IP: {registered_ip}
+
+🛠️ **AWS'de Environment Variable Güncelleyin:**
+```
+COC_API_TOKEN=yeni_token_burada
+```
+
+🌐 **developer.clashofclans.com'dan:**
+1. Yeni API key oluşturun
+2. IP: `{current_ip}` yazın
+3. Environment variable'ı güncelleyin"""
+            
+        except Exception as e:
+            text = f"❌ **IP kontrol hatası:** {str(e)}"
+        
+        self.send_message(chat_id, text)
+    
+    def handle_text_message(self, message):
+        """Metin mesajlarını işle"""
+        user_id = str(message['from']['id'])
+        chat_id = message['chat']['id']
+        text = message['text'].upper()
+        
+        # Günlük mesaj sayısını artır
+        if self.today not in self.daily_stats:
+            self.daily_stats[self.today] = {
+                'active_users': [],
+                'new_registrations': [],
+                'warnings_given': 0,
+                'total_messages': 0,
+                'start_time': datetime.now().isoformat()
+            }
+        
+        self.daily_stats[self.today]['total_messages'] += 1
+        
+        if text == '/START' or text == 'START':
+            self.handle_start(message)
+        elif text == 'KLAN':
+            self.handle_klan_command(message)
+        elif text == 'ANALIZ':
+            self.handle_analiz_command(message)
+        elif text == 'RUTBE':
+            self.handle_rutbe_command(message)
+        elif text == 'PASIF':
+            self.handle_pasif_command(message)
+        elif text == 'STATS':
+            self.handle_stats_command(message)
+        elif text == 'IPCHECK':
+            self.handle_ipcheck_command(message)
+        elif text == 'COC':
+            self.send_message(chat_id, "🏰 **COC Tag'inizi yazın:**\n📋 Örnek: #ABC123XYZ")
+        elif text.startswith('#') and len(text) >= 4:
+            # COC tag kaydet
+            if user_id in self.users:
+                self.users[user_id]['coc_tag'] = text
+                self.send_message(chat_id, f"✅ **COC tag kaydedildi!**\n🏷️ **Tag:** `{text}`")
+                self.save_data()
+        else:
+            # Küfür kontrolü
+            self.check_profanity(message)
+    
     def check_profanity(self, message):
         """Küfür kontrolü"""
         user_id = str(message['from']['id'])
@@ -992,7 +852,14 @@ Hoş geldin {first_name}! ⚔️
         """Botu çalıştır"""
         print("🏰 Kemal'in Değneği - Tam Otomatik Klan Yöneticisi")
         print("🤖 Clash of Clans API entegrasyonu aktif")
-        print("🔄 Otomatik saatlik klan analizi çalışıyor")
+        print(f"🔧 AWS Mode: {'✓' if RUNNING_ON_AWS else '✗'}")
+        print(f"🌐 Current IP: {self.current_ip}")
+        
+        if not RUNNING_ON_AWS:
+            print("🔄 Otomatik saatlik klan analizi çalışıyor")
+        else:
+            print("☁️ AWS Lambda - Event-driven mode")
+            
         print("📱 Telegram komutu: /start")
         print("🛑 Durdurmak için Ctrl+C")
         print("-" * 60)
@@ -1019,6 +886,54 @@ Hoş geldin {first_name}! ⚔️
             print(f"❌ Ana hata: {e}")
             self.save_data()
 
+# AWS Lambda handler fonksiyonu
+def lambda_handler(event, context):
+    """AWS Lambda için handler"""
+    try:
+        bot = AutoClanManager()
+        
+        # Webhook'tan gelen mesajı işle
+        if 'body' in event:
+            import json
+            update = json.loads(event['body'])
+            
+            if 'message' in update and 'text' in update['message']:
+                bot.handle_text_message(update['message'])
+        
+        # CloudWatch Events ile tetiklenen otomatik analiz
+        elif event.get('source') == 'aws.events':
+            print("🔄 Zamanlanmış analiz tetiklendi")
+            analysis = bot.analyze_clan()
+            
+            # Admins'e özet gönder
+            if analysis:
+                summary = f"""🤖 **Otomatik Analiz Raporu**
+                
+🏰 {analysis['clan_info']['name']}
+👑 En iyi: {len(analysis['top_performers'])}
+⚠️ Pasif: {len(analysis['inactive_members'])}
+🔄 Rütbe: {len(analysis['role_recommendations'])}
+
+🕐 {datetime.now().strftime('%H:%M')}"""
+                
+                for admin_id in ADMIN_USERS:
+                    bot.send_message(admin_id, summary)
+        
+        return {
+            'statusCode': 200,
+            'body': json.dumps({'status': 'success'})
+        }
+        
+    except Exception as e:
+        print(f"❌ Lambda error: {e}")
+        return {
+            'statusCode': 500,
+            'body': json.dumps({'error': str(e)})
+        }
+
 if __name__ == '__main__':
-    bot = AutoClanManager()
-    bot.run()
+    if RUNNING_ON_AWS:
+        print("☁️ AWS Lambda modunda çalışıyor")
+    else:
+        bot = AutoClanManager()
+        bot.run()
