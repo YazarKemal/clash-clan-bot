@@ -4,6 +4,13 @@ import json
 import os
 from datetime import datetime, timedelta
 
+# IP adresini öğren ve yazdır
+try:
+    ip = requests.get('https://httpbin.org/ip').json()['origin']
+    print(f"🌐 Bot IP adresi: {ip}")
+except:
+    print("IP bulunamadı")
+
 BOT_TOKEN = "7341092014:AAFegDvTd2ozU7fWMoyxriJuCn5wqkypvaY"
 ADMIN_USERS = ["8114999904"]  # Buraya kendi Telegram ID'nizi yazın
 
