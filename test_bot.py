@@ -653,8 +653,8 @@ Hoş geldin {first_name}! ⚔️
                 self.users[user_id]['coc_tag'] = text
                 self.send_message(chat_id, f"✅ **COC tag kaydedildi!**\n🏷️ **Tag:** `{text}`")
                 self.save_data()
-        elif text == 'STATS':
-            self.handle_stats_command(message)
+        elif text == 'APITEST':
+            self.handle_api_test_command(message)
         else:
             # Küfür kontrolü
             self.check_profanity(message)
@@ -757,6 +757,60 @@ Hoş geldin {first_name}! ⚔️
             
             if not any([total_warnings > 10, analyses and avg_inactive > 5, total_active < 20]):
                 text += "\n🎉 Her şey yolunda gidiyor!"
+        
+        self.send_message(chat_id, text)
+    
+    def handle_api_test_command(self, message):
+        """API test komutu"""
+        chat_id = message['chat']['id']
+        
+        headers = {
+            'Authorization': f'Bearer {COC_API_TOKEN}',
+            'Accept': 'application/json'
+        }
+        
+        try:
+            # Basit API testi
+            clan_url = f"{COC_API_BASE}/clans/{CLAN_TAG.replace('#', '%23')}"
+            response = requests.get(clan_url, headers=headers, timeout=10)
+            
+            text = f"""🔧 **API Test Sonucu**
+
+📡 **URL:** {clan_url}
+📊 **Status Code:** {response.status_code}
+🕐 **Zaman:** {datetime.now().strftime('%H:%M:%S')}
+
+"""
+            
+            if response.status_code == 200:
+                data = response.json()
+                text += f"""✅ **BAŞARILI!**
+🏰 Klan: {data.get('name', 'Bilinmiyor')}
+👥 Üye: {data.get('members', 0)}
+🌍 Ülke: {data.get('location', {}).get('name', 'Bilinmiyor')}
+📈 Seviye: {data.get('clanLevel', 0)}"""
+            
+            elif response.status_code == 403:
+                text += """❌ **403 HATASI**
+🔒 Erişim reddedildi
+💡 Muhtemel sebepler:
+• API key süresi dolmuş
+• IP adresi yanlış
+• Klan ayarları değişmiş"""
+            
+            elif response.status_code == 404:
+                text += """❌ **404 HATASI**
+🔍 Klan bulunamadı
+💡 Muhtemel sebepler:
+• Klan tag'i yanlış
+• Klan silinmiş
+• Cache gecikmi"""
+            
+            else:
+                text += f"❌ **HATA: {response.status_code}**\n{response.text[:200]}"
+                
+        except Exception as e:
+            text = f"❌ **Bağlantı Hatası:**\n{str(e)}"
         
         self.send_message(chat_id, text)
     
