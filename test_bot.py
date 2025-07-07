@@ -2,29 +2,57 @@ import requests
 import time
 import json
 import os
+import asyncio
+import threading
 from datetime import datetime, timedelta
 
 # IP adresini öğren ve yazdır
 try:
-    ip = requests.get('https://httpbin.org/ip').json()['origin']
+    ip = requests.get('https://httpbin.org/ip', timeout=5).json()['origin']
     print(f"🌐 Bot IP adresi: {ip}")
 except:
     print("IP bulunamadı")
 
+# Bot ayarları
 BOT_TOKEN = "7341092014:AAFegDvTd2ozU7fWMoyxriJuCn5wqkypvaY"
-ADMIN_USERS = ["8114999904"]  # Buraya kendi Telegram ID'nizi yazın
+ADMIN_USERS = ["8114999904"]
+COC_API_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiIsImtpZCI6IjI4YTMxOGY3LTAwMDatYTFlYi03ZmExLTJjNzQzM2M2Y2NhNSJ9.eyJpc3MiOiJzdXBlcmNlbGwiLCJhdWQiOiJzdXBlcmNlbGw6Z2FtZWFwaSIsImp0aSI6IjkxNmE0YTdjLWQxZDQtNDc5Ny1hNjdiLTlkZjU0NGEzZDI0YyIsImlhdCI6MTc1MTg1MjkxMywic3ViIjoiZGV2ZWxvcGVyLzRiYTU2MTc5LWE5NDgtIDEwZGMtMjZiNS04ZGY3OTY3MmI0ZjQiLCJzY29wZXMiOlsiY2xhc2giXSwibGltaXRzIjpbeyJ0aWVyIjoiZGV2ZWxvcGVyL3NpbHZlciIsInR5cGUiOiJ0aHJvdHRsaW5nIn0seyJjaWRycyI6WyIyMDguNzcuMjQ0LjEwIl0sInR5cGUiOiJjbGllbnQifV19.kEd4nhUlq4XQ7_X2uVHYi02OfXdOPfjDn3h9R1ES5HOaLws8iVe5UKrbN4gQajwpnv7Ju2SOicYB5vyZkj0lSA"
+CLAN_TAG = "#2RGC8UPYV"
+COC_API_BASE = "https://api.clashofclans.com/v1"
 
-class DailyActiveClanBot:
+# Rütbe sistemı
+ROLE_HIERARCHY = {
+    'member': 1,
+    'admin': 2, 
+    'coLeader': 3,
+    'leader': 4
+}
+
+ROLE_NAMES = {
+    'member': 'Üye',
+    'admin': 'Başkan', 
+    'coLeader': 'Yardımcı Lider',
+    'leader': 'Lider'
+}
+
+# Küfür listesi
+BAD_WORDS = ['aptal', 'salak', 'mal', 'ahmak', 'gerizekalı']
+
+class AutoClanManager:
     def __init__(self):
         self.base_url = f"https://api.telegram.org/bot{BOT_TOKEN}"
         self.offset = 0
         self.data_file = "clan_data.json"
         self.load_data()
         self.today = datetime.now().strftime('%Y-%m-%d')
+        self.last_clan_check = None
         print(f"✅ Bot başlatıldı - Tarih: {self.today}")
         
-        # Günlük analiz yap
-        self.daily_analysis()
+        # İlk klan analizi
+        self.analyze_clan()
+        
+        # Otomatik klan kontrolü başlat (her saat)
+        self.start_auto_clan_monitoring()
         
     def load_data(self):
         """Kalıcı verileri dosyadan yükle"""
@@ -35,6 +63,7 @@ class DailyActiveClanBot:
                     self.users = data.get('users', {})
                     self.daily_stats = data.get('daily_stats', {})
                     self.warnings_data = data.get('warnings_data', {})
+                    self.clan_history = data.get('clan_history', {})
                     print(f"✅ {len(self.users)} kullanıcı verisi yüklendi")
             except:
                 self.reset_data()
@@ -46,6 +75,7 @@ class DailyActiveClanBot:
         self.users = {}
         self.daily_stats = {}
         self.warnings_data = {}
+        self.clan_history = {}
         print("🔄 Yeni veri yapısı oluşturuldu")
     
     def save_data(self):
@@ -54,6 +84,7 @@ class DailyActiveClanBot:
             'users': self.users,
             'daily_stats': self.daily_stats,
             'warnings_data': self.warnings_data,
+            'clan_history': self.clan_history,
             'last_save': datetime.now().isoformat()
         }
         
@@ -64,47 +95,233 @@ class DailyActiveClanBot:
         except Exception as e:
             print(f"❌ Kaydetme hatası: {e}")
     
-    def daily_analysis(self):
-        """Günlük analiz ve rapor"""
-        today = self.today
-        
-        if today not in self.daily_stats:
-            self.daily_stats[today] = {
-                'active_users': [],
-                'new_registrations': [],
-                'warnings_given': 0,
-                'total_messages': 0,
-                'start_time': datetime.now().isoformat()
-            }
-        
-        # Son 7 günün analizi
-        self.weekly_analysis()
-        
-        print(f"📊 Günlük analiz tamamlandı: {today}")
-    
-    def weekly_analysis(self):
-        """Haftalık trend analizi"""
-        last_7_days = []
-        for i in range(7):
-            date = (datetime.now() - timedelta(days=i)).strftime('%Y-%m-%d')
-            last_7_days.append(date)
-        
-        weekly_data = {
-            'dates': last_7_days,
-            'active_users': 0,
-            'total_warnings': 0,
-            'new_members': 0
+    def get_clan_data(self):
+        """Clash of Clans API'den klan verilerini çek"""
+        headers = {
+            'Authorization': f'Bearer {COC_API_TOKEN}',
+            'Accept': 'application/json'
         }
         
-        for date in last_7_days:
-            if date in self.daily_stats:
-                day_data = self.daily_stats[date]
-                weekly_data['active_users'] += len(day_data.get('active_users', []))
-                weekly_data['total_warnings'] += day_data.get('warnings_given', 0)
-                weekly_data['new_members'] += len(day_data.get('new_registrations', []))
+        try:
+            # Klan genel bilgileri
+            clan_url = f"{COC_API_BASE}/clans/{CLAN_TAG.replace('#', '%23')}"
+            response = requests.get(clan_url, headers=headers, timeout=10)
+            
+            if response.status_code == 200:
+                clan_data = response.json()
+                print(f"✅ Klan verisi alındı: {clan_data['name']}")
+                return clan_data
+            else:
+                print(f"❌ COC API Hatası: {response.status_code}")
+                return None
+                
+        except Exception as e:
+            print(f"❌ COC API Bağlantı hatası: {e}")
+            return None
+    
+    def get_clan_war_data(self):
+        """Klan savaşı verilerini çek"""
+        headers = {
+            'Authorization': f'Bearer {COC_API_TOKEN}',
+            'Accept': 'application/json'
+        }
         
-        self.weekly_data = weekly_data
-        return weekly_data
+        try:
+            war_url = f"{COC_API_BASE}/clans/{CLAN_TAG.replace('#', '%23')}/currentwar"
+            response = requests.get(war_url, headers=headers, timeout=10)
+            
+            if response.status_code == 200:
+                war_data = response.json()
+                print(f"✅ Savaş verisi alındı")
+                return war_data
+            else:
+                print(f"⚠️ Savaş verisi alınamadı: {response.status_code}")
+                return None
+                
+        except Exception as e:
+            print(f"❌ Savaş API hatası: {e}")
+            return None
+    
+    def analyze_clan_member_performance(self, member, war_data=None):
+        """Üye performansını analiz et"""
+        score = 0
+        reasons = []
+        
+        # Bağış skoru (0-40 puan)
+        donations = member.get('donations', 0)
+        received = member.get('donationsReceived', 0)
+        
+        if donations >= 1000:
+            score += 40
+            reasons.append("🎁 Mükemmel bağış")
+        elif donations >= 500:
+            score += 30
+            reasons.append("🎁 İyi bağış")
+        elif donations >= 200:
+            score += 20
+            reasons.append("🎁 Orta bağış")
+        elif donations >= 50:
+            score += 10
+            reasons.append("🎁 Az bağış")
+        else:
+            reasons.append("❌ Bağış yok")
+        
+        # Aktiflik skoru (trophies değişimi)
+        trophies = member.get('trophies', 0)
+        if trophies >= 3000:
+            score += 20
+            reasons.append("🏆 Yüksek kupa")
+        elif trophies >= 2000:
+            score += 15
+            reasons.append("🏆 Orta kupa")
+        elif trophies >= 1000:
+            score += 10
+            reasons.append("🏆 Düşük kupa")
+        
+        # Savaş performansı (varsa)
+        if war_data and war_data.get('state') in ['inWar', 'warEnded']:
+            # Savaş üyesi kontrolü
+            for war_member in war_data.get('clan', {}).get('members', []):
+                if war_member['tag'] == member['tag']:
+                    attacks = war_member.get('attacks', [])
+                    if attacks:
+                        total_stars = sum(attack.get('stars', 0) for attack in attacks)
+                        if total_stars >= 4:
+                            score += 30
+                            reasons.append("⚔️ Mükemmel savaş")
+                        elif total_stars >= 2:
+                            score += 20
+                            reasons.append("⚔️ İyi savaş")
+                        else:
+                            score += 10
+                            reasons.append("⚔️ Zayıf savaş")
+                    else:
+                        reasons.append("❌ Savaş yapmadı")
+                    break
+        
+        return score, reasons
+    
+    def get_recommended_role(self, score, current_role):
+        """Performansa göre önerilen rütbe"""
+        if score >= 80:
+            return 'admin'  # Başkan
+        elif score >= 50:
+            return 'member'  # Aktif üye kalır
+        else:
+            return 'member'  # Pasif üye
+    
+    def analyze_clan(self):
+        """Tam klan analizi"""
+        print("🔍 Klan analizi başlıyor...")
+        
+        clan_data = self.get_clan_data()
+        war_data = self.get_clan_war_data()
+        
+        if not clan_data:
+            print("❌ Klan verisi alınamadı")
+            return
+        
+        analysis_time = datetime.now().isoformat()
+        
+        # Klan analiz sonuçları
+        analysis = {
+            'timestamp': analysis_time,
+            'clan_info': {
+                'name': clan_data['name'],
+                'level': clan_data['clanLevel'],
+                'members': clan_data['members'],
+                'total_points': clan_data['clanPoints'],
+                'war_wins': clan_data.get('warWins', 0),
+                'war_losses': clan_data.get('warLosses', 0)
+            },
+            'member_analysis': [],
+            'role_recommendations': [],
+            'inactive_members': [],
+            'top_performers': []
+        }
+        
+        print(f"📊 Analiz ediliyor: {clan_data['name']} ({clan_data['members']} üye)")
+        
+        # Her üyeyi analiz et
+        for member in clan_data['memberList']:
+            score, reasons = self.analyze_clan_member_performance(member, war_data)
+            current_role = member['role']
+            recommended_role = self.get_recommended_role(score, current_role)
+            
+            member_analysis = {
+                'name': member['name'],
+                'tag': member['tag'],
+                'role': current_role,
+                'recommended_role': recommended_role,
+                'score': score,
+                'reasons': reasons,
+                'donations': member.get('donations', 0),
+                'trophies': member.get('trophies', 0)
+            }
+            
+            analysis['member_analysis'].append(member_analysis)
+            
+            # Rütbe değişikliği önerisi
+            if recommended_role != current_role and recommended_role != 'coLeader':
+                role_change = {
+                    'name': member['name'],
+                    'current': ROLE_NAMES.get(current_role, current_role),
+                    'recommended': ROLE_NAMES.get(recommended_role, recommended_role),
+                    'score': score,
+                    'reason': f"Performans: {score}/100"
+                }
+                analysis['role_recommendations'].append(role_change)
+            
+            # Pasif üyeler
+            if score < 30:
+                analysis['inactive_members'].append({
+                    'name': member['name'],
+                    'score': score,
+                    'issues': [r for r in reasons if '❌' in r]
+                })
+            
+            # En iyi performans
+            if score >= 70:
+                analysis['top_performers'].append({
+                    'name': member['name'],
+                    'score': score
+                })
+        
+        # Sonuçları kaydet
+        self.clan_history[analysis_time] = analysis
+        self.save_data()
+        
+        print(f"✅ Klan analizi tamamlandı!")
+        print(f"👑 En iyi performans: {len(analysis['top_performers'])} üye")
+        print(f"⚠️ Pasif üye: {len(analysis['inactive_members'])} üye")
+        print(f"🔄 Rütbe önerisi: {len(analysis['role_recommendations'])} üye")
+        
+        return analysis
+    
+    def start_auto_clan_monitoring(self):
+        """Otomatik klan izleme başlat"""
+        def monitor_loop():
+            while True:
+                try:
+                    print("🔄 Otomatik klan kontrolü...")
+                    self.analyze_clan()
+                    print("💤 Bir sonraki kontrol 1 saat sonra...")
+                    time.sleep(3600)  # 1 saat bekle
+                except Exception as e:
+                    print(f"❌ Otomatik kontrol hatası: {e}")
+                    time.sleep(1800)  # Hata durumunda 30 dakika bekle
+        
+        # Arka planda çalıştır
+        monitor_thread = threading.Thread(target=monitor_loop, daemon=True)
+        monitor_thread.start()
+        print("🤖 Otomatik klan izleme başlatıldı (her saat)")
+    
+    def get_latest_clan_analysis(self):
+        """En son klan analizini getir"""
+        if self.clan_history:
+            latest_key = max(self.clan_history.keys())
+            return self.clan_history[latest_key]
+        return None
     
     def send_message(self, chat_id, text, reply_markup=None):
         """Mesaj gönder"""
@@ -153,150 +370,248 @@ class DailyActiveClanBot:
                 'join_date': self.today,
                 'last_active': self.today
             }
-            # Yeni kayıt
-            self.daily_stats[self.today]['new_registrations'].append(user_id)
         else:
-            # Mevcut kullanıcı
             self.users[user_id]['last_active'] = self.today
         
         # Günlük aktiflik
+        if self.today not in self.daily_stats:
+            self.daily_stats[self.today] = {
+                'active_users': [],
+                'new_registrations': [],
+                'warnings_given': 0,
+                'total_messages': 0,
+                'start_time': datetime.now().isoformat()
+            }
+        
         if user_id not in self.daily_stats[self.today]['active_users']:
             self.daily_stats[self.today]['active_users'].append(user_id)
         
-        # Günlük özet
-        daily_summary = self.get_daily_summary()
+        # Klan durumu özeti
+        clan_summary = self.get_clan_summary()
         
-        text = f"""🏰 **Kemal'in Değneği - Günlük Aktif Bot**
+        text = f"""🏰 **Kemal'in Değneği - Otomatik Klan Yöneticisi**
 
 Hoş geldin {first_name}! ⚔️
 
-📊 **Bugünün Özeti:**
-{daily_summary}
+🤖 **Otomatik Özellikler:**
+• 🔄 Saatlik klan analizi
+• 👑 Otomatik rütbe önerileri  
+• ⚠️ Pasif üye tespiti
+• 📊 Gerçek zamanlı istatistikler
+
+{clan_summary}
 
 🎯 **Komutlar:**
-• **COC** - Clash of Clans kayıt
-• **STATS** - Kişisel istatistikler
+• **KLAN** - Canlı klan durumu
+• **ANALIZ** - Son analiz raporu
+• **RUTBE** - Rütbe önerileri
+• **PASIF** - Pasif üyeler
 • **GUNLUK** - Günlük rapor
-• **HAFTALIK** - Haftalık analiz
-• **KLAN** - Klan durumu
-
-💬 **Kullanım:** Sadece komut yazın"""
+• **HAFTALIK** - Haftalık analiz"""
         
         self.send_message(chat_id, text)
         self.save_data()
     
-    def get_daily_summary(self):
-        """Günlük özet hazırla"""
-        today_data = self.daily_stats[self.today]
+    def get_clan_summary(self):
+        """Klan özeti hazırla"""
+        analysis = self.get_latest_clan_analysis()
         
-        active_count = len(today_data['active_users'])
-        new_count = len(today_data['new_registrations'])
-        warnings_count = today_data['warnings_given']
+        if not analysis:
+            return "📊 **Klan Durumu:** İlk analiz yapılıyor..."
         
-        # Performans analizi
-        total_registered = len([u for u in self.users.values() if u['coc_tag']])
-        avg_performance = 0
-        if total_registered > 0:
-            total_avg = sum([u['stars']/(u['wars']*2) if u['wars'] > 0 else 0 for u in self.users.values() if u['coc_tag']])
-            avg_performance = total_avg / total_registered
+        clan_info = analysis['clan_info']
+        inactive_count = len(analysis['inactive_members'])
+        top_count = len(analysis['top_performers'])
+        role_changes = len(analysis['role_recommendations'])
         
-        summary = f"""👥 Bugün aktif: {active_count}
-🆕 Yeni kayıt: {new_count}
-⚠️ Verilen uyarı: {warnings_count}
-📈 Klan ortalaması: {avg_performance:.1f}⭐"""
+        last_update = datetime.fromisoformat(analysis['timestamp'])
+        time_ago = datetime.now() - last_update
+        hours_ago = int(time_ago.total_seconds() / 3600)
         
-        return summary
+        return f"""📊 **Klan Durumu:**
+🏰 {clan_info['name']} (Seviye {clan_info['level']})
+👥 Üye: {clan_info['members']}/50
+🏆 Klan Puanı: {clan_info['total_points']:,}
+⚔️ Savaş: {clan_info['war_wins']}W-{clan_info['war_losses']}L
+
+🎯 **Analiz Sonuçları:**
+👑 En iyi performans: {top_count} üye
+⚠️ Pasif üye: {inactive_count} üye  
+🔄 Rütbe önerisi: {role_changes} üye
+
+🕐 Son analiz: {hours_ago} saat önce"""
     
-    def handle_gunluk_command(self, message):
-        """Günlük rapor komutu"""
+    def handle_klan_command(self, message):
+        """KLAN komutu - Canlı klan durumu"""
+        chat_id = message['chat']['id']
+        
+        # Anlık klan verisi çek
+        clan_data = self.get_clan_data()
+        war_data = self.get_clan_war_data()
+        
+        if not clan_data:
+            text = "❌ Klan verilerine erişilemiyor. Lütfen daha sonra deneyin."
+            self.send_message(chat_id, text)
+            return
+        
+        # Savaş durumu
+        war_status = "🔄 Savaş yok"
+        if war_data:
+            if war_data.get('state') == 'preparation':
+                war_status = "⏳ Savaş hazırlığı"
+            elif war_data.get('state') == 'inWar':
+                war_status = "⚔️ Savaş devam ediyor"
+            elif war_data.get('state') == 'warEnded':
+                war_status = "✅ Savaş bitti"
+        
+        text = f"""🏰 **{clan_data['name']} - Canlı Durum**
+
+👥 **Üye Bilgileri:**
+• Toplam üye: {clan_data['members']}/50
+• Klan seviyesi: {clan_data['clanLevel']}
+• Klan puanı: {clan_data['clanPoints']:,}
+
+⚔️ **Savaş Bilgileri:**
+• Durum: {war_status}
+• Galibiyet: {clan_data.get('warWins', 0)}
+• Mağlubiyet: {clan_data.get('warLosses', 0)}
+
+📊 **En Aktif 5 Üye:**"""
+        
+        # En aktif üyeleri göster (bağış bazında)
+        sorted_members = sorted(clan_data['memberList'], 
+                              key=lambda x: x.get('donations', 0), reverse=True)
+        
+        for i, member in enumerate(sorted_members[:5], 1):
+            role_emoji = {'leader': '👑', 'coLeader': '🔱', 'admin': '⭐', 'member': '👤'}.get(member['role'], '👤')
+            text += f"\n{i}. {role_emoji} {member['name']} - {member.get('donations', 0)} bağış"
+        
+        text += f"\n\n🕐 Anlık veri - {datetime.now().strftime('%H:%M')}"
+        
+        self.send_message(chat_id, text)
+    
+    def handle_analiz_command(self, message):
+        """ANALIZ komutu - Son analiz raporu"""
         chat_id = message['chat']['id']
         user_id = str(message['from']['id'])
         
         if user_id not in ADMIN_USERS:
             text = "❌ Bu komut sadece adminler için!"
-        else:
-            # Detaylı günlük rapor
-            today_data = self.daily_stats[self.today]
-            
-            text = f"""📊 **Günlük Detaylı Rapor - {self.today}**
+            self.send_message(chat_id, text)
+            return
+        
+        analysis = self.get_latest_clan_analysis()
+        
+        if not analysis:
+            text = "❌ Henüz analiz yapılmamış. Lütfen bekleyin..."
+            self.send_message(chat_id, text)
+            return
+        
+        clan_info = analysis['clan_info']
+        last_update = datetime.fromisoformat(analysis['timestamp'])
+        
+        text = f"""📊 **Detaylı Klan Analizi**
 
-👥 **Kullanıcı Aktivitesi:**
-• Toplam aktif: {len(today_data['active_users'])}
-• Yeni kayıt: {len(today_data['new_registrations'])}
-• Toplam mesaj: {today_data['total_messages']}
+🏰 **{clan_info['name']}**
+📅 Analiz: {last_update.strftime('%d.%m.%Y %H:%M')}
 
-⚠️ **Uyarı İstatistikleri:**
-• Bugün verilen: {today_data['warnings_given']}
-• Toplam uyarılı üye: {len([u for u in self.users.values() if u['warnings'] > 0])}
-
-🏆 **Performans:**
-• Kayıtlı üye: {len([u for u in self.users.values() if u['coc_tag']])}
-• En aktif: {self.get_most_active()}
-
-🕐 **Başlatma:** {today_data['start_time'][:16]}"""
+👑 **En İyi Performans ({len(analysis['top_performers'])}):**"""
+        
+        for performer in analysis['top_performers'][:5]:
+            text += f"\n• {performer['name']} - {performer['score']}/100"
+        
+        text += f"\n\n⚠️ **Pasif Üyeler ({len(analysis['inactive_members'])}):**"
+        
+        for inactive in analysis['inactive_members'][:5]:
+            issues = ', '.join(inactive['issues'][:2])
+            text += f"\n• {inactive['name']} - {inactive['score']}/100 ({issues})"
+        
+        text += f"\n\n🔄 **Rütbe Önerileri ({len(analysis['role_recommendations'])}):**"
+        
+        for role_rec in analysis['role_recommendations'][:5]:
+            text += f"\n• {role_rec['name']}: {role_rec['current']} → {role_rec['recommended']}"
+        
+        if len(analysis['role_recommendations']) > 5:
+            text += f"\n... ve {len(analysis['role_recommendations'])-5} üye daha"
         
         self.send_message(chat_id, text)
     
-    def handle_haftalik_command(self, message):
-        """Haftalık analiz komutu"""
+    def handle_rutbe_command(self, message):
+        """RUTBE komutu - Rütbe önerileri"""
         chat_id = message['chat']['id']
         user_id = str(message['from']['id'])
         
         if user_id not in ADMIN_USERS:
             text = "❌ Bu komut sadece adminler için!"
+            self.send_message(chat_id, text)
+            return
+        
+        analysis = self.get_latest_clan_analysis()
+        
+        if not analysis:
+            text = "❌ Henüz analiz yapılmamış."
+            self.send_message(chat_id, text)
+            return
+        
+        role_recs = analysis['role_recommendations']
+        
+        if not role_recs:
+            text = "✅ **Tüm üyelerin rütbeleri uygun!**\n\nHerkes performansına göre doğru rütbede."
         else:
-            weekly = self.weekly_data
+            text = f"""👑 **Rütbe Değişiklik Önerileri**
+
+🔄 **{len(role_recs)} üye için öneri:**
+
+"""
             
-            text = f"""📈 **Haftalık Analiz Raporu**
-
-📊 **Son 7 Gün Özeti:**
-• Toplam aktiflik: {weekly['active_users']} 
-• Yeni üyeler: {weekly['new_members']}
-• Toplam uyarılar: {weekly['total_warnings']}
-
-📅 **Trend Analizi:**
-{self.get_weekly_trends()}
-
-🎯 **Öneriler:**
-{self.get_recommendations()}"""
+            for rec in role_recs:
+                direction = "⬆️" if rec['recommended'] == 'admin' else "⬇️"
+                text += f"{direction} **{rec['name']}**\n"
+                text += f"   {rec['current']} → {rec['recommended']}\n"
+                text += f"   Performans: {rec['score']}/100\n\n"
+            
+            text += "⚠️ **Not:** Yardımcı Lider ataması güvenlik nedeniyle manuel yapılmalı."
         
         self.send_message(chat_id, text)
     
-    def get_most_active(self):
-        """En aktif kullanıcıyı bul"""
-        today_actives = self.daily_stats[self.today]['active_users']
-        if today_actives:
-            most_active_id = today_actives[0]
-            return self.users[most_active_id]['name']
-        return "Henüz yok"
-    
-    def get_weekly_trends(self):
-        """Haftalık trendleri analiz et"""
-        # Basit trend analizi
-        if self.weekly_data['active_users'] > 10:
-            return "📈 Aktivite yüksek seviyede"
-        elif self.weekly_data['active_users'] > 5:
-            return "📊 Aktivite orta seviyede"
+    def handle_pasif_command(self, message):
+        """PASIF komutu - Pasif üyeler"""
+        chat_id = message['chat']['id']
+        user_id = str(message['from']['id'])
+        
+        if user_id not in ADMIN_USERS:
+            text = "❌ Bu komut sadece adminler için!"
+            self.send_message(chat_id, text)
+            return
+        
+        analysis = self.get_latest_clan_analysis()
+        
+        if not analysis:
+            text = "❌ Henüz analiz yapılmamış."
+            self.send_message(chat_id, text)
+            return
+        
+        inactive_members = analysis['inactive_members']
+        
+        if not inactive_members:
+            text = "🎉 **Harika! Pasif üye yok!**\n\nTüm klan üyeleri aktif gözüküyor."
         else:
-            return "📉 Aktivite düşük, teşvik gerekli"
-    
-    def get_recommendations(self):
-        """Haftalık önerileri hazırla"""
-        recommendations = []
+            text = f"""⚠️ **Pasif Üye Raporu**
+
+🔍 **{len(inactive_members)} pasif üye tespit edildi:**
+
+"""
+            
+            for inactive in inactive_members:
+                text += f"👤 **{inactive['name']}** - {inactive['score']}/100\n"
+                text += f"   Sorunlar: {', '.join(inactive['issues'])}\n\n"
+            
+            text += """💡 **Öneriler:**
+• Bu üyeleri uyarın
+• Aktiflik artmazsa rütbe düşürün
+• Çok pasifse klandan çıkarın"""
         
-        if self.weekly_data['total_warnings'] > 5:
-            recommendations.append("⚠️ Uyarı sayısı yüksek, kural hatırlatması yapın")
-        
-        if self.weekly_data['new_members'] < 2:
-            recommendations.append("👥 Yeni üye sayısı düşük, tanıtım yapın")
-        
-        if self.weekly_data['active_users'] < 10:
-            recommendations.append("🎯 Aktivite düşük, etkinlik düzenleyin")
-        
-        if not recommendations:
-            recommendations.append("🎉 Her şey yolunda gidiyor!")
-        
-        return "\n".join([f"• {rec}" for rec in recommendations])
+        self.send_message(chat_id, text)
     
     def handle_text_message(self, message):
         """Metin mesajlarını işle"""
@@ -305,10 +620,27 @@ Hoş geldin {first_name}! ⚔️
         text = message['text'].upper()
         
         # Günlük mesaj sayısını artır
+        if self.today not in self.daily_stats:
+            self.daily_stats[self.today] = {
+                'active_users': [],
+                'new_registrations': [],
+                'warnings_given': 0,
+                'total_messages': 0,
+                'start_time': datetime.now().isoformat()
+            }
+        
         self.daily_stats[self.today]['total_messages'] += 1
         
         if text == '/START' or text == 'START':
             self.handle_start(message)
+        elif text == 'KLAN':
+            self.handle_klan_command(message)
+        elif text == 'ANALIZ':
+            self.handle_analiz_command(message)
+        elif text == 'RUTBE':
+            self.handle_rutbe_command(message)
+        elif text == 'PASIF':
+            self.handle_pasif_command(message)
         elif text == 'GUNLUK':
             self.handle_gunluk_command(message)
         elif text == 'HAFTALIK':
@@ -323,11 +655,110 @@ Hoş geldin {first_name}! ⚔️
                 self.save_data()
         elif text == 'STATS':
             self.handle_stats_command(message)
-        elif text == 'KLAN':
-            self.handle_klan_command(message)
         else:
             # Küfür kontrolü
             self.check_profanity(message)
+    
+    def handle_gunluk_command(self, message):
+        """Günlük rapor komutu"""
+        chat_id = message['chat']['id']
+        user_id = str(message['from']['id'])
+        
+        if user_id not in ADMIN_USERS:
+            text = "❌ Bu komut sadece adminler için!"
+        else:
+            today_data = self.daily_stats.get(self.today, {})
+            analysis = self.get_latest_clan_analysis()
+            
+            text = f"""📊 **Günlük Detaylı Rapor - {self.today}**
+
+🤖 **Otomatik Klan Analizi:**"""
+            
+            if analysis:
+                clan_info = analysis['clan_info']
+                text += f"""
+🏰 {clan_info['name']} - {clan_info['members']} üye
+👑 En iyi performans: {len(analysis['top_performers'])} üye
+⚠️ Pasif üye: {len(analysis['inactive_members'])} üye
+🔄 Rütbe önerisi: {len(analysis['role_recommendations'])} üye"""
+            else:
+                text += "\n⏳ İlk analiz bekleniyor..."
+            
+            text += f"""
+
+👥 **Bot Kullanım İstatistikleri:**
+• Toplam aktif: {len(today_data.get('active_users', []))}
+• Yeni kayıt: {len(today_data.get('new_registrations', []))}
+• Toplam mesaj: {today_data.get('total_messages', 0)}
+• Verilen uyarı: {today_data.get('warnings_given', 0)}
+
+🕐 **Başlatma:** {today_data.get('start_time', 'Bilinmiyor')[:16]}"""
+        
+        self.send_message(chat_id, text)
+    
+    def handle_haftalik_command(self, message):
+        """Haftalık analiz komutu"""
+        chat_id = message['chat']['id']
+        user_id = str(message['from']['id'])
+        
+        if user_id not in ADMIN_USERS:
+            text = "❌ Bu komut sadece adminler için!"
+        else:
+            # Son 7 günün analizi
+            last_7_days = []
+            for i in range(7):
+                date = (datetime.now() - timedelta(days=i)).strftime('%Y-%m-%d')
+                last_7_days.append(date)
+            
+            total_active = 0
+            total_warnings = 0
+            total_messages = 0
+            
+            for date in last_7_days:
+                if date in self.daily_stats:
+                    day_data = self.daily_stats[date]
+                    total_active += len(day_data.get('active_users', []))
+                    total_warnings += day_data.get('warnings_given', 0)
+                    total_messages += day_data.get('total_messages', 0)
+            
+            # Klan trend analizi
+            analyses = list(self.clan_history.values())[-7:]  # Son 7 analiz
+            
+            text = f"""📈 **Haftalık Klan Analizi**
+
+🤖 **Otomatik Takip Sonuçları:**"""
+            
+            if analyses:
+                avg_inactive = sum(len(a.get('inactive_members', [])) for a in analyses) / len(analyses)
+                avg_top = sum(len(a.get('top_performers', [])) for a in analyses) / len(analyses)
+                
+                text += f"""
+📊 Ortalama pasif üye: {avg_inactive:.1f}
+🏆 Ortalama en iyi: {avg_top:.1f}
+🔄 Toplam analiz: {len(analyses)}"""
+            
+            text += f"""
+
+👥 **Bot Aktivite (7 gün):**
+• Toplam aktiflik: {total_active}
+• Toplam uyarı: {total_warnings}
+• Toplam mesaj: {total_messages}
+
+🎯 **Öneriler:**"""
+            
+            if total_warnings > 10:
+                text += "\n⚠️ Uyarı sayısı yüksek, kural hatırlatması yapın"
+            
+            if analyses and avg_inactive > 5:
+                text += "\n👥 Pasif üye sayısı yüksek, temizlik gerekli"
+            
+            if total_active < 20:
+                text += "\n📢 Bot kullanımı düşük, üyeleri teşvik edin"
+            
+            if not any([total_warnings > 10, analyses and avg_inactive > 5, total_active < 20]):
+                text += "\n🎉 Her şey yolunda gidiyor!"
+        
+        self.send_message(chat_id, text)
     
     def handle_stats_command(self, message):
         """İstatistik komutu"""
@@ -342,47 +773,54 @@ Hoş geldin {first_name}! ⚔️
             user_data = self.users[user_id]
             days_active = (datetime.now() - datetime.strptime(user_data['join_date'], '%Y-%m-%d')).days + 1
             
+            # Klan analizinde kullanıcıyı bul
+            analysis = self.get_latest_clan_analysis()
+            user_analysis = None
+            
+            if analysis:
+                for member in analysis['member_analysis']:
+                    if member['tag'] == user_data['coc_tag']:
+                        user_analysis = member
+                        break
+            
             text = f"""⚔️ **Kişisel İstatistikler**
 
 👤 **Oyuncu:** {user_data['name']}
 🏷️ **COC Tag:** `{user_data['coc_tag']}`
 📅 **Katılım:** {user_data['join_date']} ({days_active} gün)
-⚠️ **Uyarılar:** {user_data['warnings']}/3
-🏆 **Savaşlar:** {user_data['wars']}
-⭐ **Yıldızlar:** {user_data['stars']}"""
-        
-        self.send_message(chat_id, text)
-    
-    def handle_klan_command(self, message):
-        """Klan durumu komutu"""
-        chat_id = message['chat']['id']
-        
-        total_users = len(self.users)
-        registered_users = len([u for u in self.users.values() if u['coc_tag']])
-        today_active = len(self.daily_stats[self.today]['active_users'])
-        
-        text = f"""🏰 **Klan Durumu**
+⚠️ **Uyarılar:** {user_data['warnings']}/3"""
+            
+            if user_analysis:
+                text += f"""
 
-👥 **Üye İstatistikleri:**
-• Toplam üye: {total_users}
-• COC kayıtlı: {registered_users}
-• Bugün aktif: {today_active}
+🤖 **Otomatik Analiz:**
+📊 Performans skoru: {user_analysis['score']}/100
+👑 Mevcut rütbe: {ROLE_NAMES.get(user_analysis['role'], user_analysis['role'])}
+🎯 Önerilen rütbe: {ROLE_NAMES.get(user_analysis['recommended_role'], user_analysis['recommended_role'])}
+🎁 Bağış: {user_analysis['donations']}
+🏆 Kupa: {user_analysis['trophies']}
 
-📊 **Günlük Veriler:**
-{self.get_daily_summary()}
-
-🕐 **Son güncelleme:** {datetime.now().strftime('%H:%M')}"""
+💡 **Değerlendirme:**"""
+                
+                for reason in user_analysis['reasons'][:3]:
+                    text += f"\n• {reason}"
+                
+                if user_analysis['score'] >= 70:
+                    text += "\n\n🌟 **Harika performans! Klanın gururu!**"
+                elif user_analysis['score'] >= 50:
+                    text += "\n\n👍 **İyi gidiyorsun! Devam et!**"
+                else:
+                    text += "\n\n⚡ **Daha aktif olmalısın!**"
         
         self.send_message(chat_id, text)
     
     def check_profanity(self, message):
         """Küfür kontrolü"""
-        bad_words = ['aptal', 'salak', 'mal', 'ahmak']
         user_id = str(message['from']['id'])
         chat_id = message['chat']['id']
         text_lower = message['text'].lower()
         
-        for bad_word in bad_words:
+        for bad_word in BAD_WORDS:
             if bad_word in text_lower:
                 if user_id in self.users:
                     self.users[user_id]['warnings'] += 1
@@ -410,11 +848,12 @@ Hoş geldin {first_name}! ⚔️
     
     def run(self):
         """Botu çalıştır"""
-        print("🏰 Kemal'in Değneği - Günlük Aktif Bot")
-        print("📊 Günlük analiz ve veri saklama aktif")
-        print("📱 Telegram'da /start gönderin")
-        print("🛑 Ctrl+C ile durdurun")
-        print("-" * 50)
+        print("🏰 Kemal'in Değneği - Tam Otomatik Klan Yöneticisi")
+        print("🤖 Clash of Clans API entegrasyonu aktif")
+        print("🔄 Otomatik saatlik klan analizi çalışıyor")
+        print("📱 Telegram komutu: /start")
+        print("🛑 Durdurmak için Ctrl+C")
+        print("-" * 60)
         
         try:
             while True:
@@ -435,9 +874,9 @@ Hoş geldin {first_name}! ⚔️
             self.save_data()
             print("🛑 Bot durduruldu!")
         except Exception as e:
-            print(f"❌ Hata: {e}")
+            print(f"❌ Ana hata: {e}")
             self.save_data()
 
 if __name__ == '__main__':
-    bot = DailyActiveClanBot()
+    bot = AutoClanManager()
     bot.run()
