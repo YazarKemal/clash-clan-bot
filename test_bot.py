@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 
 # Environment variables'dan güvenli token alma
 BOT_TOKEN = os.getenv('BOT_TOKEN', '7708393145:AAFHHNBUNNMhx8mTCZ4iWy83ZdgiNB-SoNc')
-COC_API_TOKEN = os.getenv('COC_API_TOKEN', 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiIsImtpZCI6IjI4YTMxOGY3LTAwMDAtYTFlYi03ZmExLTJjNzQzM2M2Y2NhNSJ9.eyJpc3MiOiJzdXBlcmNlbGwiLCJhdWQiOiJzdXBlcmNlbGw6Z2FtZWFwaSIsImp0aSI6IjI5Y2QzZGJhLTEzMjktNDBmMy05MmFkLTg0NmJkZmQwNjI4YyIsImlhdCI6MTc1MTkxMjAxNywic3ViIjoiZGV2ZWxvcGVyLzRiYTU2MTc5LWE5NDgtMTBkYy0yNmI1LThkZjc5NjcyYjRmNCIsInNjb3BlcyI6WyJjbGFzaCJdLCJsaW1pdHMiOlt7InRpZXIiOiJkZXZlbG9wZXIvc2lsdmVyIiwidHlwZSI6InRocm90dGxpbmcifSx7ImNpZHJzIjpbIjU2LjIyOC42OS4yMyJdLCJ0eXBlIjoiY2xpZW50In1dfQ.K6meIBPNtbmzBeefJ3Naa2pF7fRgoCB6UYXCRitdg6LKyBwj02pL0wEYe4fhTlrwO9eHtDgAuqHiYz36M6RLhQ')
+COC_API_TOKEN = os.getenv('COC_API_TOKEN', 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiIsImtpZCI6IjI4YTMxOGY3LTAwMDAtYTFlYi03ZmExLTJjNzQzM2M2Y2NhNSJ9.eyJpc3MiOiJzdXBlcmNlbGwiLCJhdWQiOiJzdXBlcmNlbGw6Z2FtZWFwaSIsImp0aSI6IjI5Y2QzZGJhLTEzMjktNDBmMy05MmFkLTg0NmJkZmQwNjI4YyIsImlhdCI6MTc1MTkxMjAxNywic3ViIjoiZGV2ZWxvcGVyLzRiYTU2MTc5LWE5NDgtMTBkYy0yNmI1LThkZjc5NjcyYjRmNCIsInNjb3BlcyI6WyJjbGFzaCJdLCJsaW1pdHMiOlt7InRpZXIiOiJkZXZlbG9wZXIvc2lsdmVyIiwidHlwZSI6InRocm90dGxpbmcifSx7ImNpZHJzIjpbIjUyLjU3LjMzLjE3NyJdLCJ0eXBlIjoiY2xpZW50In1dfQ.K6meIBPNtbmzBeefJ3Naa2pF7fRgoCB6UYXCRitdg6LKyBwj02pL0wEYe4fhTlrwO9eHtDgAuqHiYz36M6RLhQ')
 
 # Diğer ayarlar
 ADMIN_USERS = os.getenv('ADMIN_USERS', '8114999904').split(',')
@@ -18,6 +18,32 @@ COC_API_BASE = "https://api.clashofclans.com/v1"
 # AWS Lambda uyumluluğu için
 RUNNING_ON_AWS = os.getenv('AWS_EXECUTION_ENV') is not None
 DATA_PATH = '/tmp/' if RUNNING_ON_AWS else './'
+
+# Token'dan IP çıkar (JWT decode)
+def get_token_ip():
+    """Token'dan kayıtlı IP'yi çıkar"""
+    try:
+        import base64
+        # JWT'nin payload kısmını al
+        token_parts = COC_API_TOKEN.split('.')
+        if len(token_parts) >= 2:
+            payload = token_parts[1]
+            # Base64 padding ekle
+            payload += '=' * (4 - len(payload) % 4)
+            decoded = base64.b64decode(payload)
+            payload_data = json.loads(decoded.decode('utf-8'))
+            
+            # limits içinden IP'yi bul
+            limits = payload_data.get('limits', [])
+            for limit in limits:
+                if limit.get('type') == 'client':
+                    cidrs = limit.get('cidrs', [])
+                    if cidrs:
+                        return cidrs[0]  # İlk IP'yi dön
+        return "Bulunamadı"
+    except Exception as e:
+        print(f"Token IP çıkarma hatası: {e}")
+        return "52.57.33.177"  # Yeni token IP'si
 
 # IP adresini öğren ve yazdır
 def get_current_ip():
@@ -56,10 +82,21 @@ class AutoClanManager:
         self.today = datetime.now().strftime('%Y-%m-%d')
         self.last_clan_check = None
         self.current_ip = get_current_ip()
+        self.token_ip = get_token_ip()
         
         print(f"✅ Bot başlatıldı - Tarih: {self.today}")
         print(f"🔧 AWS Mode: {'✓' if RUNNING_ON_AWS else '✗'}")
         print(f"📁 Data Path: {DATA_PATH}")
+        print(f"🌐 Current IP: {self.current_ip}")
+        print(f"🔑 Token IP: {self.token_ip}")
+        
+        # IP uyumsuzluğu kontrolü
+        if self.current_ip and self.current_ip != self.token_ip:
+            print("⚠️ IP UYUMSUZLUĞU TESPİT EDİLDİ!")
+            print(f"   Mevcut IP: {self.current_ip}")
+            print(f"   Token IP: {self.token_ip}")
+        else:
+            print("✅ IP Durumu: Eşleşiyor")
         
         # İlk klan analizi
         self.analyze_clan()
@@ -103,8 +140,9 @@ class AutoClanManager:
             'last_save': datetime.now().isoformat(),
             'bot_info': {
                 'ip': self.current_ip,
+                'token_ip': self.token_ip,
                 'aws_mode': RUNNING_ON_AWS,
-                'version': '2.0'
+                'version': '2.1'
             }
         }
         
@@ -135,9 +173,10 @@ class AutoClanManager:
                 print(f"✅ Klan verisi alındı: {clan_data['name']}")
                 return clan_data
             elif response.status_code == 403:
-                print(f"❌ COC API Yetki Hatası: IP değişmiş olabilir ({self.current_ip})")
-                # IP değişikliğini bildir
-                self.notify_ip_change()
+                print(f"❌ COC API Yetki Hatası: IP uyumsuzluğu ({self.current_ip} ≠ {self.token_ip})")
+                # IP değişikliğini sadece gerçekten değişmişse bildir
+                if self.current_ip != self.token_ip:
+                    self.notify_ip_change()
                 return None
             else:
                 print(f"❌ COC API Hatası: {response.status_code}")
@@ -152,21 +191,23 @@ class AutoClanManager:
         if not hasattr(self, '_ip_notified'):
             for admin_id in ADMIN_USERS:
                 try:
-                    text = f"""🚨 **IP DEĞİŞİKLİĞİ TESPİT EDİLDİ!**
+                    text = f"""🚨 **IP UYUMSUZLUĞU TESPİT EDİLDİ!**
                     
-🌐 **Yeni IP:** {self.current_ip}
-🔑 **Mevcut token:** 52.57.33.177 için yapılandırılmış
+🌐 **Mevcut IP:** {self.current_ip}
+🔑 **Token IP'si:** {self.token_ip}
 
-🛠️ **YAPMANIZ GEREKENLER:**
+🛠️ **ÇÖZÜM:**
 1. developer.clashofclans.com'a gidin
 2. Yeni API key oluşturun  
 3. IP olarak `{self.current_ip}` girin
 4. Yeni token'ı environment variable olarak güncelleyin
 
-⚡ **AWS'de:**
+⚡ **Lightsail'de:**
+```bash
+export COC_API_TOKEN="yeni_token_buraya"
 ```
-COC_API_TOKEN=yeni_token_buraya
-```"""
+
+💡 **Not:** Bu uyumsuzluk AWS IP değişikliğinden kaynaklanabilir."""
                     
                     self.send_message(admin_id, text)
                 except:
@@ -443,7 +484,8 @@ COC_API_TOKEN=yeni_token_buraya
         # Klan durumu özeti
         clan_summary = self.get_clan_summary()
         
-        aws_info = f"\n🌐 **AWS Deploy:** {'✅ Aktif' if RUNNING_ON_AWS else '❌ Local'}" if user_id in ADMIN_USERS else ""
+        aws_info = f"\n🌐 **Deploy:** {'☁️ AWS' if RUNNING_ON_AWS else '🖥️ Local'}" if user_id in ADMIN_USERS else ""
+        ip_status = f"\n🔍 **IP Status:** {'✅ Eşleşiyor' if self.current_ip == self.token_ip else '⚠️ Uyumsuz'}" if user_id in ADMIN_USERS else ""
         
         text = f"""🏰 **Kemal'in Değneği - Otomatik Klan Yöneticisi**
 
@@ -453,7 +495,7 @@ Hoş geldin {first_name}! ⚔️
 • 🔄 Saatlik klan analizi
 • 👑 Otomatik rütbe önerileri  
 • ⚠️ Pasif üye tespiti
-• 📊 Gerçek zamanlı istatistikler{aws_info}
+• 📊 Gerçek zamanlı istatistikler{aws_info}{ip_status}
 
 {clan_summary}
 
@@ -737,13 +779,13 @@ Hoş geldin {first_name}! ⚔️
             # Şu anki IP'yi al
             current_ip = get_current_ip() or "Bulunamadı"
             
-            # Token'dan kayıtlı IP'yi çıkar
-            registered_ip = "52.57.33.177"  # Yeni token'da kayıtlı IP
+            # Token'dan kayıtlı IP'yi çıkar  
+            registered_ip = self.token_ip
             
             text = f"""🌐 **IP Durum Kontrolü**
 
 📍 **Şu anki IP:** `{current_ip}`
-🔑 **API'de kayıtlı:** `{registered_ip}`
+🔑 **Token'da kayıtlı:** `{registered_ip}`
 
 """
             
@@ -753,19 +795,31 @@ Hoş geldin {first_name}! ⚔️
 
 🧪 Test için: **KLAN** komutunu deneyin"""
             else:
-                text += f"""❌ **IP DEĞİŞMİŞ!**
-🔄 Yeni IP: {current_ip}
-🔒 Eski IP: {registered_ip}
+                text += f"""❌ **IP UYUMSUZLUĞU!**
+🔄 Mevcut IP: {current_ip}
+🔒 Token IP: {registered_ip}
 
-🛠️ **AWS'de Environment Variable Güncelleyin:**
-```
-COC_API_TOKEN=yeni_token_burada
+🛠️ **ÇÖZÜM ADIMLAR:**
+
+**1️⃣ Yeni Token Oluşturun:**
+• developer.clashofclans.com'a gidin
+• Create New Key tıklayın
+• IP: `{current_ip}` yazın
+• Yeni token'ı kopyalayın
+
+**2️⃣ Lightsail'de Token Güncelleyin:**
+```bash
+nano clash_bot.py
+# 11. satırda COC_API_TOKEN'ı güncelleyin
+# Ctrl+X, Y, Enter ile kaydedin
 ```
 
-🌐 **developer.clashofclans.com'dan:**
-1. Yeni API key oluşturun
-2. IP: `{current_ip}` yazın
-3. Environment variable'ı güncelleyin"""
+**3️⃣ Bot'u Yeniden Başlatın:**
+```bash
+python3 clash_bot.py
+```
+
+💡 **Not:** Bu uyumsuzluk AWS IP değişikliğinden kaynaklanıyor."""
             
         except Exception as e:
             text = f"❌ **IP kontrol hatası:** {str(e)}"
@@ -854,6 +908,12 @@ COC_API_TOKEN=yeni_token_burada
         print("🤖 Clash of Clans API entegrasyonu aktif")
         print(f"🔧 AWS Mode: {'✓' if RUNNING_ON_AWS else '✗'}")
         print(f"🌐 Current IP: {self.current_ip}")
+        print(f"🔑 Token IP: {self.token_ip}")
+        
+        if self.current_ip != self.token_ip:
+            print(f"⚠️ IP UYUMSUZLUĞU: {self.current_ip} ≠ {self.token_ip}")
+        else:
+            print("✅ IP Durumu: Eşleşiyor")
         
         if not RUNNING_ON_AWS:
             print("🔄 Otomatik saatlik klan analizi çalışıyor")
