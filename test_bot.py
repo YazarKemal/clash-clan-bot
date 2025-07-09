@@ -23,6 +23,11 @@ COC_API_BASE = "https://api.clashofclans.com/v1"
 RUNNING_ON_AWS = os.getenv('AWS_EXECUTION_ENV') is not None
 DATA_PATH = '/tmp/' if RUNNING_ON_AWS else './'
 
+@bot.message_handler(commands=['start'])
+def start_message(message):
+    print("Start komutu alındı!")  # <-- Bu satırı ekle
+    bot.send_message(message.chat.id, "Merhaba! Bot başladı.")
+
 # Rütbe sistemı
 ROLE_HIERARCHY = {
     'member': 1,
