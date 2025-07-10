@@ -4,11 +4,31 @@ import json
 import os
 import asyncio
 import threading
-import numpy as np
-import statistics
+import sys
 from datetime import datetime, timedelta
 from collections import defaultdict
 import math
+
+# Python sürüm kontrolü
+if sys.version_info < (3, 6):
+    raise RuntimeError("Python 3.6 veya üzeri gereklidir")
+
+
+class MathUtils:
+    """Basit matematik yardımcıları"""
+
+    @staticmethod
+    def mean(values):
+        return sum(values) / len(values) if values else 0
+
+    @staticmethod
+    def stdev(values):
+        n = len(values)
+        if n < 2:
+            return 0
+        mean_val = MathUtils.mean(values)
+        variance = sum((x - mean_val) ** 2 for x in values) / (n - 1)
+        return math.sqrt(variance)
 
 from telebot import TeleBot
 
@@ -113,7 +133,7 @@ class AdvancedAnalytics:
             return 0
         
         try:
-            return statistics.stdev(values)
+            return MathUtils.stdev(values)
         except:
             return 0
     
@@ -123,8 +143,8 @@ class AdvancedAnalytics:
             return False, 0
         
         try:
-            mean_val = statistics.mean(values)
-            std_val = statistics.stdev(values)
+            mean_val = MathUtils.mean(values)
+            std_val = MathUtils.stdev(values)
             
             if std_val == 0:
                 return False, 0
@@ -258,11 +278,11 @@ class WarAnalyzer(AdvancedAnalytics):
             analysis['win_rate'] = round((analysis['wins'] / analysis['total_wars']) * 100, 2)
         
         if star_counts:
-            analysis['average_stars'] = round(statistics.mean(star_counts), 2)
+            analysis['average_stars'] = round(MathUtils.mean(star_counts), 2)
             analysis['consistency_score'] = round(100 - (self.calculate_volatility(star_counts) * 10), 2)
-        
+
         if destruction_rates:
-            analysis['attack_efficiency'] = round(statistics.mean(destruction_rates), 2)
+            analysis['attack_efficiency'] = round(MathUtils.mean(destruction_rates), 2)
         
         return analysis
     
