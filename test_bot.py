@@ -1936,3 +1936,7 @@ export COC_API_TOKEN="yeni_token_buraya"
                         self.send_message(chat_id, f"🚫 **{name}** 3 uyarı aldığı için klandan atılmalı!")
                     else:
                         self.send_message(chat_id, f"⚠️ **{name}**, küfür yasak! Uyarı: {warnings}/3")
+
+
+if __name__ == '__main__':
+    bot.polling(none_stop=True)
