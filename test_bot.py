@@ -511,6 +511,32 @@ class PredictionEngine(AdvancedAnalytics):
 
 class AutoClanManager:
     def __init__(self):
+        print("\n=== BOT DEBUG START ===", flush=True)
+
+        try:
+            print("DEBUG 1: get_clan_data çağrılıyor...", flush=True)
+            clan_data = self.get_clan_data()
+            print(f"DEBUG 1 RESULT: {clan_data}", flush=True)
+
+            print("DEBUG 2: get_clan_war_data çağrılıyor...", flush=True)
+            war_data = self.get_clan_war_data()
+            print(f"DEBUG 2 RESULT: {war_data}", flush=True)
+
+            print("DEBUG 3: run_comprehensive_analysis başlatılıyor...", flush=True)
+            analysis = self.run_comprehensive_analysis()
+            print(f"DEBUG 3 RESULT: {analysis}", flush=True)
+
+            print("DEBUG 4: start_advanced_monitoring çağrılacak mı?", flush=True)
+            if not RUNNING_ON_AWS:
+                print("DEBUG 4: start_advanced_monitoring() ÇAĞRILIYOR", flush=True)
+                self.start_advanced_monitoring()
+            else:
+                print("DEBUG 4: AWS ortamında, monitoring başlatılmıyor.", flush=True)
+
+            print("=== BOT DEBUG END ===\n", flush=True)
+
+        except Exception as e:
+            print(f"❌ DEBUG ERROR: {e}", flush=True)
         self.base_url = f"https://api.telegram.org/bot{BOT_TOKEN}"
         self.offset = 0
         self.data_file = os.path.join(DATA_PATH, "clan_data.json")
