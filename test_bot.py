@@ -30,16 +30,12 @@ class MathUtils:
         variance = sum((x - mean_val) ** 2 for x in values) / (n - 1)
         return math.sqrt(variance)
 
-from telebot import TeleBot
-
 # Telegram bot tokenını alıyoruz
 BOT_TOKEN = os.getenv('BOT_TOKEN', '7708393145:AAFHHNBUNNMhx8mTCZ4iWy83ZdgiNB-SoNc')
 
-# Bot nesnesini oluşturuyoruz
-bot = TeleBot(BOT_TOKEN)
-
-# Environment variables'dan güvenli token alma
-BOT_TOKEN = os.getenv('BOT_TOKEN', '7708393145:AAFHHNBUNNMhx8mTCZ4iWy83ZdgiNB-SoNc')
+# Bu script doğrudan Telegram API'si ile haberleşir. TeleBot
+# kütüphanesini kullanmadığımız için polling işlemi de kendimiz
+# yöneteceğiz.
 COC_API_TOKEN = os.getenv('COC_API_TOKEN', 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiIsImtpZCI6IjI4YTMxOGY3LTAwMDAtYTFlYi03ZmExLTJjNzQzM2M2Y2NhNSJ9.eyJpc3MiOiJzdXBlcmNlbGwiLCJhdWQiOiJzdXBlcmNlbGw6Z2FtZWFwaSIsImp0aSI6ImJkYzliMTQ1LTZkY2QtNDU0Mi1hNmNmLTgwMzViNDJiZWFjNyIsImlhdCI6MTc1MjAyNzAxMiwic3ViIjoiZGV2ZWxvcGVyLzRiYTU2MTc5LWE5NDgtMTBkYy0yNmI1LThkZjc5NjcyYjRmNCIsInNjb3BlcyI6WyJjbGFzaCJdLCJsaW1pdHMiOlt7InRpZXIiOiJkZXZlbG9wZXIvc2lsdmVyIiwidHlwZSI6InRocm90dGxpbmcifSx7ImNpZHJzIjpbIjEzLjYxLjU2LjE5NyJdLCJ0eXBlIjoiY2xpZW50In1dfQ.xkmTiuBnozS8NSK8F1D8ST939QxlKj5qZ7EkRI45ZhDqCS406RFr0Jzh4hTJkEB3oWgNBDZh7aVs0xFqxBRWvw')
 
 # Diğer ayarlar
@@ -50,11 +46,6 @@ COC_API_BASE = "https://api.clashofclans.com/v1"
 # AWS Lambda uyumluluğu için
 RUNNING_ON_AWS = os.getenv('AWS_EXECUTION_ENV') is not None
 DATA_PATH = '/tmp/' if RUNNING_ON_AWS else './'
-
-@bot.message_handler(commands=['start'])
-def start_message(message):
-    print("Start komutu alındı!")  # <-- Bu satırı ekle
-    bot.send_message(message.chat.id, "Merhaba! Bot başladı.")
 
 # Rütbe sistemı
 ROLE_HIERARCHY = {
@@ -1937,6 +1928,24 @@ export COC_API_TOKEN="yeni_token_buraya"
                     else:
                         self.send_message(chat_id, f"⚠️ **{name}**, küfür yasak! Uyarı: {warnings}/3")
 
+    def run(self):
+        """Kendi polling mekanizması ile botu çalıştır."""
+        print("🚀 Custom polling başlatıldı")
+        while True:
+            updates = self.get_updates()
+            if not updates or not updates.get('ok'):
+                time.sleep(1)
+                continue
+
+            for update in updates.get('result', []):
+                self.offset = update['update_id'] + 1
+                message = update.get('message')
+                if message and 'text' in message:
+                    self.handle_text_message(message)
+
+            time.sleep(1)
+
 
 if __name__ == '__main__':
-    bot.polling(none_stop=True)
+    manager = AutoClanManager()
+    manager.run()
