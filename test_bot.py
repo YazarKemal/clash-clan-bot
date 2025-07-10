@@ -1396,7 +1396,13 @@ Hoş geldin {first_name}! ⚔️
 👑 En iyi: {top_count} | ⚠️ Pasif: {inactive_count}
 
 🕐 Son AI analizi: {hours_ago} saat önce"""
-    
+
+    def handle_klan_command(self, message):
+        """KLAN komutu - Klan durumu raporu"""
+        chat_id = message['chat']['id']
+        summary = self.get_clan_summary()
+        self.send_message(chat_id, summary)
+
     # Yeni gelişmiş komut handlers
     def handle_trend_command(self, message):
         """TREND komutu - Trend analizi raporu"""
