@@ -1812,18 +1812,22 @@ AI sistemi beklenmedik değişimleri tespit ediyor.
         user_id = str(message['from']['id'])
         chat_id = message['chat']['id']
         text = message['text'].upper()
-        
-        # Günlük mesaj sayısını artır
-        if self.today not in self.daily_stats:
-            self.daily_stats[self.today] = {
+
+        # Tarihi güncelle ve günlük istatistikleri hazırlık
+        today = datetime.now().strftime('%Y-%m-%d')
+        if today != self.today:
+            self.today = today
+
+        if today not in self.daily_stats:
+            self.daily_stats[today] = {
                 'active_users': [],
                 'new_registrations': [],
                 'warnings_given': 0,
                 'total_messages': 0,
                 'start_time': datetime.now().isoformat()
             }
-        
-        self.daily_stats[self.today]['total_messages'] += 1
+
+        self.daily_stats[today]['total_messages'] += 1
         
         # Komut routing
         if text == '/START' or text == 'START':
