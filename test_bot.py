@@ -929,8 +929,8 @@ class AutoClanManager:
         
         self.member_trends[member_tag].append(trend_data)
         
-        # Son 30 kayıtı sakla
-        if len(self.member_trends[member_tag]) > 30:
+        # Son 30 kayıtı sakla - key kontrolü ile
+        if member_tag in self.member_trends and len(self.member_trends[member_tag]) > 30:
             self.member_trends[member_tag] = self.member_trends[member_tag][-30:]
     
     def run_trend_analysis(self, clan_data):
