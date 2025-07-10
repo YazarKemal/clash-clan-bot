@@ -1394,6 +1394,11 @@ Hoş geldin {first_name}! ⚔️
         summary = self.get_clan_summary()
         self.send_message(chat_id, summary)
 
+    def handle_analiz_command(self, message):
+        """ANALIZ komutu - Temel analiz raporu"""
+        chat_id = message['chat']['id']
+        self.send_message(chat_id, "📊 Analiz komutu çalışıyor.")
+
     # Yeni gelişmiş komut handlers
     def handle_trend_command(self, message):
         """TREND komutu - Trend analizi raporu"""
