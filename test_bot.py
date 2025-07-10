@@ -1838,6 +1838,7 @@ AI sistemi beklenmedik değişimleri tespit ediyor.
         if text == '/START' or text == 'START':
             self.handle_start(message)
         elif text == 'KLAN':
+            # call KLAN command handler
             self.handle_klan_command(message)
         elif text == 'ANALIZ':
             self.handle_analiz_command(message)
