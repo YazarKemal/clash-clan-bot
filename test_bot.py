@@ -1366,11 +1366,11 @@ Hoş geldin {first_name}! ⚔️
     def get_clan_summary(self):
         """Gelişmiş klan özeti"""
         analysis = self.get_latest_clan_analysis()
-        
+
         if not analysis:
             return "📊 **Klan Durumu:** İlk AI analizi yapılıyor..."
-        
-        basic = analysis.get('basic_analysis', {})
+
+        basic = analysis.get('basic_analysis', {}) if analysis else {}
         clan_info = basic.get('clan_info', {})
         trends = analysis.get('trend_analysis', {}).get('clan_trend_summary', {})
         risks = analysis.get('risk_assessment', {}).get('risk_summary', {})
