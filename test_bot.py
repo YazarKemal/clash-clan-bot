@@ -16,7 +16,7 @@ except:
 # Bot ayarları
 BOT_TOKEN = "7341092014:AAFegDvTd2ozU7fWMoyxriJuCn5wqkypvaY"
 ADMIN_USERS = ["8114999904"]
-COC_API_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiIsImtpZCI6IjI4YTMxOGY3LTAwMDatYTFlYi03ZmExLTJjNzQzM2M2Y2NhNSJ9.eyJpc3MiOiJzdXBlcmNlbGwiLCJhdWQiOiJzdXBlcmNlbGw6Z2FtZWFwaSIsImp0aSI6IjZiYTE1MTdmLTE4YWItNDFhMS1iZTA3LTUxMzMyN2Q0ZTk3YyIsImlhdCI6MTc1MTg1NDIzOSwic3ViIjoiZGV2ZWxvcGVyLzRiYTU2MTc5LWE5NDgt MTBkYy0yNmI1LThkZjc5NjcyYjRmNCIsInNjb3BlcyI6WyJjbGFzaCJdLCJsaW1pdHMiOlt7InRpZXIiOiJkZXZlbG9wZXIvc2lsdmVyIiwidHlwZSI6InRocm90dGxpbmcifSx7ImNpZHJzIjpbIjIwOC43Ny4yNDQuODMiXSwidHlwZSI6ImNsaWVudCJ9XX0.vsBXveIRmpkw_PFbMWCwOLs4sPUQEeRanIMVL3Ozpg94x7YJSv2YxB_MCbmppVZWhoUBlPR0L8hC9zhTa69m5A"
+COC_API_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiIsImtpZCI6IjI4YTMxOGY3LTAwMDAtYTFlYi03ZmExLTJjNzQzM2M2Y2NhNSJ9.eyJpc3MiOiJzdXBlcmNlbGwiLCJhdWQiOiJzdXBlcmNlbGw6Z2FtZWFwaSIsImp0aSI6ImJkYzliMTQ1LTZkY2QtNDU0Mi1hNmNmLTgwMzViNDJiZWFjNyIsImlhdCI6MTc1MjAyNzAxMiwic3ViIjoiZGV2ZWxvcGVyLzRiYTU2MTc5LWE5NDgtMTBkYy0yNmI1LThkZjc5NjcyYjRmNCIsInNjb3BlcyI6WyJjbGFzaCJdLCJsaW1pdHMiOlt7InRpZXIiOiJkZXZlbG9wZXIvc2lsdmVyIiwidHlwZSI6InRocm90dGxpbmcifSx7ImNpZHJzIjpbIjEzLjYxLjU2LjE5NyJdLCJ0eXBlIjoiY2xpZW50In1dfQ.xkmTiuBnozS8NSK8F1D8ST939QxlKj5qZ7EkRI45ZhDqCS406RFr0Jzh4hTJkEB3oWgNBDZh7aVs0xFqxBRWvw"
 CLAN_TAG = "#2RGC8UPYV"
 COC_API_BASE = "https://api.clashofclans.com/v1"
 
@@ -655,6 +655,10 @@ Hoş geldin {first_name}! ⚔️
                 self.save_data()
         elif text == 'IPCHECK':
             self.handle_ip_check_command(message)
+        elif text == 'APITEST':
+            self.handle_api_test_command(message)
+        elif text == 'STATS':
+            self.handle_stats_command(message)
         else:
             # Küfür kontrolü
             self.check_profanity(message)
@@ -782,8 +786,8 @@ Hoş geldin {first_name}! ⚔️
                 token_text = decoded.decode('utf-8')
                 
                 # IP bilgisini bul
-                if '208.77.244.76' in token_text:
-                    registered_ip = '208.77.244.76'
+                if '13.61.56.197' in token_text:
+                    registered_ip = '13.61.56.197'
                 elif '208.77.244.83' in token_text:
                     registered_ip = '208.77.244.83'
                 elif '208.77.244.10' in token_text:
