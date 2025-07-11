@@ -1125,7 +1125,6 @@ def integrate_war_monitoring_to_auto_check(self):
         
         # İlk klan analizi
         self.analyze_clan()
-        
         # Otomatik klan kontrolü başlat (her saat)
         self.start_auto_clan_monitoring()
         
