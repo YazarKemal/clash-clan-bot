@@ -71,6 +71,36 @@ class AutoClanManager:
         self.today = datetime.now().strftime('%Y-%m-%d')
         self.last_clan_check = None
         print(f"✅ Bot başlatıldı - Tarih: {self.today}")
+        try:
+            while True:
+                updates = self.get_updates()
+                
+                if updates and updates.get('ok'):
+                    for update in updates['result']:
+                        self.offset = update['update_id'] + 1
+                        
+                        if 'message' in update and 'text' in update['message']:
+                            print(f"📨 Mesaj: {update['message']['text']}")
+                            self.handle_text_message(update['message'])
+                
+                time.sleep(2)
+                
+        except KeyboardInterrupt:
+            print("\n💾 Veriler kaydediliyor...")
+            self.save_data()
+            print("🛑 Bot durduruldu!")
+        except Exception as e:
+            print(f"❌ Ana hata: {e}")
+            self.save_data()
+
+    def run(self):
+        """Botu çalıştır"""
+        print("🏰 Kemal'in Değneği - Tam Otomatik Klan Yöneticisi")
+        print("🤖 Clash of Clans API entegrasyonu aktif")
+        print("🔄 Otomatik saatlik klan analizi çalışıyor")
+        print("📱 Telegram komutu: /start")
+        print("🛑 Durdurmak için Ctrl+C")
+        print("-" * 60)
 
         # Akıllı Savaş Planlama Özellikleri
 # Ana AutoClanManager sınıfına eklenecek methodlar
@@ -2084,37 +2114,6 @@ Hoş geldin {first_name}! ⚔️
                     
                     self.save_data()
                 return
-    
-    def run(self):
-        """Botu çalıştır"""
-        print("🏰 Kemal'in Değneği - Tam Otomatik Klan Yöneticisi")
-        print("🤖 Clash of Clans API entegrasyonu aktif")
-        print("🔄 Otomatik saatlik klan analizi çalışıyor")
-        print("📱 Telegram komutu: /start")
-        print("🛑 Durdurmak için Ctrl+C")
-        print("-" * 60)
-        
-        try:
-            while True:
-                updates = self.get_updates()
-                
-                if updates and updates.get('ok'):
-                    for update in updates['result']:
-                        self.offset = update['update_id'] + 1
-                        
-                        if 'message' in update and 'text' in update['message']:
-                            print(f"📨 Mesaj: {update['message']['text']}")
-                            self.handle_text_message(update['message'])
-                
-                time.sleep(2)
-                
-        except KeyboardInterrupt:
-            print("\n💾 Veriler kaydediliyor...")
-            self.save_data()
-            print("🛑 Bot durduruldu!")
-        except Exception as e:
-            print(f"❌ Ana hata: {e}")
-            self.save_data()
 
 if __name__ == '__main__':
     bot = AutoClanManager()
