@@ -39,6 +39,21 @@ ROLE_NAMES = {
 BAD_WORDS = ['aptal', 'salak', 'mal', 'ahmak', 'gerizekalı']
 
 class AutoClanManager:
+     def load_data(self):
+        """Kalıcı verileri dosyadan yükle"""
+        if os.path.exists(self.data_file):
+            try:
+                with open(self.data_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    self.users = data.get('users', {})
+                    self.daily_stats = data.get('daily_stats', {})
+                    self.warnings_data = data.get('warnings_data', {})
+                    self.clan_history = data.get('clan_history', {})
+                    print(f"✅ {len(self.users)} kullanıcı verisi yüklendi")
+            except:
+                self.reset_data()
+        else:
+            self.reset_data()
     def __init__(self):
         self.base_url = f"https://api.telegram.org/bot{BOT_TOKEN}"
         self.offset = 0
@@ -1125,22 +1140,6 @@ def integrate_war_monitoring_to_auto_check(self):
     
     # Otomatik klan kontrolü başlat (her saat)
     self.start_auto_clan_monitoring()
-        
-    def load_data(self):
-        """Kalıcı verileri dosyadan yükle"""
-        if os.path.exists(self.data_file):
-            try:
-                with open(self.data_file, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                    self.users = data.get('users', {})
-                    self.daily_stats = data.get('daily_stats', {})
-                    self.warnings_data = data.get('warnings_data', {})
-                    self.clan_history = data.get('clan_history', {})
-                    print(f"✅ {len(self.users)} kullanıcı verisi yüklendi")
-            except:
-                self.reset_data()
-        else:
-            self.reset_data()
     
     def reset_data(self):
         """Veri sıfırlama"""
