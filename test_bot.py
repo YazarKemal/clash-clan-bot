@@ -1122,11 +1122,9 @@ def monitor_war_status(self):
 
 def integrate_war_monitoring_to_auto_check(self):
     """Otomatik klan kontrolüne savaş izlemeyi entegre et"""
-        
-        # İlk klan analizi
-        self.analyze_clan()
+    
         # Otomatik klan kontrolü başlat (her saat)
-        self.start_auto_clan_monitoring()
+            self.start_auto_clan_monitoring()
         
     def load_data(self):
         """Kalıcı verileri dosyadan yükle"""
@@ -1479,6 +1477,10 @@ Hoş geldin {first_name}! ⚔️
 
 {clan_summary}
 
+🎯 **Savaş Komutları:**
+- **SAVAS** - Güncel savaş durumu
+- **HEDEFIM** - Kişisel hedef önerileri
+- **SAVASONUCU** - Savaş sonuç raporu
 🎯 **Komutlar:**
 • **KLAN** - Canlı klan durumu
 • **ANALIZ** - Son analiz raporu
@@ -1711,6 +1713,18 @@ Hoş geldin {first_name}! ⚔️
         
         if text == '/START' or text == 'START':
             self.handle_start(message)
+        elif text == 'SAVAS':
+            self.handle_savas_command(message)
+        elif text == 'SAVASTAKLA':
+            self.handle_savastakla_command(message)
+        elif text == 'HEDEFIM':
+            self.handle_hedefim_command(message)
+        elif text == 'SAVASONUCU':
+            self.handle_savasonucu_command(message)
+        elif text == 'SAVASRAPOR':
+            self.handle_savasrapor_command(message)
+        elif text == 'SAVASGECMIS':
+            self.handle_savasgecmis_command(message)
         elif text == 'KLAN':
             self.handle_klan_command(message)
         elif text == 'ANALIZ':
