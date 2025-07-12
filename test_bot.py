@@ -1123,8 +1123,8 @@ def monitor_war_status(self):
 def integrate_war_monitoring_to_auto_check(self):
     """Otomatik klan kontrolüne savaş izlemeyi entegre et"""
     
-        # Otomatik klan kontrolü başlat (her saat)
-            self.start_auto_clan_monitoring()
+    # Otomatik klan kontrolü başlat (her saat)
+    self.start_auto_clan_monitoring()
         
     def load_data(self):
         """Kalıcı verileri dosyadan yükle"""
