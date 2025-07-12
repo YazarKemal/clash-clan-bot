@@ -39,6 +39,15 @@ ROLE_NAMES = {
 BAD_WORDS = ['aptal', 'salak', 'mal', 'ahmak', 'gerizekalı']
 
 class AutoClanManager:
+
+    def reset_data(self):
+        """Veri sıfırlama"""
+        self.users = {}
+        self.daily_stats = {}
+        self.warnings_data = {}
+        self.clan_history = {}
+        print("🔄 Yeni veri yapısı oluşturuldu")
+    
     def load_data(self):
         """Kalıcı verileri dosyadan yükle"""
         if os.path.exists(self.data_file):
@@ -1140,14 +1149,6 @@ def integrate_war_monitoring_to_auto_check(self):
     
     # Otomatik klan kontrolü başlat (her saat)
     self.start_auto_clan_monitoring()
-    
-    def reset_data(self):
-        """Veri sıfırlama"""
-        self.users = {}
-        self.daily_stats = {}
-        self.warnings_data = {}
-        self.clan_history = {}
-        print("🔄 Yeni veri yapısı oluşturuldu")
     
     def save_data(self):
         """Verileri dosyaya kaydet"""
