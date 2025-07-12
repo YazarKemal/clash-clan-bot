@@ -102,6 +102,27 @@ class AutoClanManager:
         print("🛑 Durdurmak için Ctrl+C")
         print("-" * 60)
 
+     def get_updates(self):
+        """Telegram güncellemelerini al"""
+        url = f"{self.base_url}/getUpdates"
+        params = {'offset': self.offset, 'timeout': 5}
+        
+        try:
+            response = requests.get(url, params=params, timeout=10)
+            return response.json()
+        except Exception as e:
+            print(f"Güncelleme alma hatası: {e}")
+            return None
+
+     def save_data(self):
+        """Verileri dosyaya kaydet"""
+        data = {
+            'users': self.users,
+            'daily_stats': self.daily_stats,
+            'warnings_data': self.warnings_data,
+            'clan_history': self.clan_history,
+            'last_save': datetime.now().isoformat()
+
         # Akıllı Savaş Planlama Özellikleri
 # Ana AutoClanManager sınıfına eklenecek methodlar
 
@@ -1179,15 +1200,6 @@ def integrate_war_monitoring_to_auto_check(self):
     
     # Otomatik klan kontrolü başlat (her saat)
     self.start_auto_clan_monitoring()
-    
-    def save_data(self):
-        """Verileri dosyaya kaydet"""
-        data = {
-            'users': self.users,
-            'daily_stats': self.daily_stats,
-            'warnings_data': self.warnings_data,
-            'clan_history': self.clan_history,
-            'last_save': datetime.now().isoformat()
         }
         
         try:
@@ -1442,18 +1454,6 @@ def integrate_war_monitoring_to_auto_check(self):
             return response.json()
         except Exception as e:
             print(f"Mesaj gönderme hatası: {e}")
-            return None
-    
-    def get_updates(self):
-        """Telegram güncellemelerini al"""
-        url = f"{self.base_url}/getUpdates"
-        params = {'offset': self.offset, 'timeout': 5}
-        
-        try:
-            response = requests.get(url, params=params, timeout=10)
-            return response.json()
-        except Exception as e:
-            print(f"Güncelleme alma hatası: {e}")
             return None
     
     def handle_start(self, message):
