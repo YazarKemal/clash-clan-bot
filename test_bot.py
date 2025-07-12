@@ -39,7 +39,7 @@ ROLE_NAMES = {
 BAD_WORDS = ['aptal', 'salak', 'mal', 'ahmak', 'gerizekalı']
 
 class AutoClanManager:
-     def load_data(self):
+      def load_data(self):
         """Kalıcı verileri dosyadan yükle"""
         if os.path.exists(self.data_file):
             try:
@@ -54,7 +54,7 @@ class AutoClanManager:
                 self.reset_data()
         else:
             self.reset_data()
-    def __init__(self):
+        def __init__(self):
         self.base_url = f"https://api.telegram.org/bot{BOT_TOKEN}"
         self.offset = 0
         self.data_file = "clan_data.json"
