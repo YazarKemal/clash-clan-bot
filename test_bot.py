@@ -1751,7 +1751,6 @@ Hoş geldin {first_name}! ⚔️
             self.handle_api_test_command(message)
         elif text == 'STATS':
             self.handle_stats_command(message)
-        self.add_war_commands_to_handler(text, message)
         
         else:
             # Küfür kontrolü
