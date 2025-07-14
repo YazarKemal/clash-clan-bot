@@ -1134,6 +1134,7 @@ def get_clan_summary(self):
 - Rütbe önerisi: {role_changes} üye
 
 Son analiz: {hours_ago} saat önce"""
+"""
     
     return summary_text
     
