@@ -1121,7 +1121,7 @@ Hoş geldin {first_name}! ⚔️
     time_ago = datetime.now() - last_update
     hours_ago = int(time_ago.total_seconds() / 3600)
     
-    summary_text = f"""📊 **Klan Durumu:**
+    summary_text = **Klan Durumu:**
 🏰 {clan_info['name']} (Seviye {clan_info['level']})
 👥 Üye: {clan_info['members']}/50
 🏆 Klan Puanı: {clan_info['total_points']:,}
