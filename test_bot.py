@@ -1097,7 +1097,7 @@ Hoş geldin {first_name}! ⚔️
 • **PASIF** - Pasif üyeler
 • **STATS** - Kişisel istatistik
 • **IPCHECK** - IP kontrol (admin)"""
-🎯 **Savaş Komutları:**
+"""🎯 **Savaş Komutları:**
 - **SAVAS** - Güncel savaş durumu ve analiz
 - **HEDEFIM** - Kişisel hedef önerileri  
 - **SAVASTAKLA** - Detaylı strateji (Admin)
