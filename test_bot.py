@@ -1110,7 +1110,7 @@ Hoş geldin {first_name}! ⚔️
     analysis = self.get_latest_clan_analysis()
     
     if not analysis:
-        return "📊 **Klan Durumu:** İlk analiz yapılıyor..."
+        return "**Klan Durumu:** İlk analiz yapılıyor..."
     
     clan_info = analysis['clan_info']
     inactive_count = len(analysis['inactive_members'])
