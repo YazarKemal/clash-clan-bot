@@ -498,34 +498,33 @@ class AutoClanManager:
                 
         except Exception as e:
             print(f"⚠️ Savaş izleme hatası: {e}")
-
-        def handle_savas_command(self, message):
-           """SAVAS komutu - Güncel savaş durumu"""
-           chat_id = message['chat']['id']
-       
-       war_analysis = self.get_war_analysis()
-       
-       if not war_analysis:
-           text = "🏰 **Şu anda savaşta değiliz**\n\n⏳ Savaş arama veya hazırlık aşamasında olabilirsiniz."
-           self.send_message(chat_id, text)
-           return
-       
-       war_state = war_analysis['war_state']
-       our_clan = war_analysis['our_clan']
-       enemy_clan = war_analysis['enemy_clan']
-       matchup = war_analysis['matchup_analysis']
-       
-       if war_state == 'preparation':
-           status_emoji = '⏳'
-           status_text = 'Hazırlık Aşaması'
-       elif war_state == 'inWar':
-           status_emoji = '⚔️'
-           status_text = 'Savaş Devam Ediyor'
-       else:
-           status_emoji = '✅'
-           status_text = 'Savaş Bitti'
-       
-       text = f"""⚔️ **SAVAS DURUMU**
+    def handle_savas_command(self, message):
+        """SAVAS komutu - Güncel savaş durumu"""
+        chat_id = message['chat']['id']
+        
+        war_analysis = self.get_war_analysis()
+        
+        if not war_analysis:
+            text = "🏰 **Şu anda savaşta değiliz**\n\n⏳ Savaş arama veya hazırlık aşamasında olabilirsiniz."
+            self.send_message(chat_id, text)
+            return
+        
+        war_state = war_analysis['war_state']
+        our_clan = war_analysis['our_clan']
+        enemy_clan = war_analysis['enemy_clan']
+        matchup = war_analysis['matchup_analysis']
+        
+        if war_state == 'preparation':
+            status_emoji = '⏳'
+            status_text = 'Hazırlık Aşaması'
+        elif war_state == 'inWar':
+            status_emoji = '⚔️'
+            status_text = 'Savaş Devam Ediyor'
+        else:
+            status_emoji = '✅'
+            status_text = 'Savaş Bitti'
+        
+        text = f"""⚔️ **SAVAS DURUMU**
 
 {status_emoji} **{status_text}**
 🆚 **{our_clan['name']}** vs **{enemy_clan['name']}**
@@ -550,44 +549,43 @@ class AutoClanManager:
 - Kalan: {our_clan['attacks_remaining']}
 
 **Detaylı analiz:** HEDEFIM komutunu kullanın"""
-       
-       self.send_message(chat_id, text)
+        
+        self.send_message(chat_id, text)
 
-   def handle_hedefim_command(self, message):
-       """HEDEFIM komutu - Kişisel hedef önerileri"""
-       chat_id = message['chat']['id']
-       user_id = str(message['from']['id'])
-       
-       war_analysis = self.get_war_analysis()
-       
-       if not war_analysis:
-           text = "❌ Şu anda savaşta değiliz."
-           self.send_message(chat_id, text)
-           return
-       
-       # Kullanıcının savaş durumunu bul
-       user_data = self.users.get(user_id, {})
-       user_coc_tag = user_data.get('coc_tag')
-       
-       if not user_coc_tag:
-           text = "❌ COC tag'iniz kayıtlı değil. **COC** yazarak kayıt olun."
-           self.send_message(chat_id, text)
-           return
-       
-       user_war_status = None
-       for member in war_analysis['member_status']:
-           if member['tag'] == user_coc_tag:
-               user_war_status = member
-               break
-       
-       if not user_war_status:
-           text = "❌ Bu savaşta yer almıyorsunuz."
-           self.send_message(chat_id, text)
-           return
-       
-       remaining_attacks = 2 - user_war_status['attacks_made']
-       
-       text = f"""🎯 **KİŞİSEL HEDEF ÖNERİLERİ**
+    def handle_hedefim_command(self, message):
+        """HEDEFIM komutu - Kişisel hedef önerileri"""
+        chat_id = message['chat']['id']
+        user_id = str(message['from']['id'])
+        
+        war_analysis = self.get_war_analysis()
+        
+        if not war_analysis:
+            text = "❌ Şu anda savaşta değiliz."
+            self.send_message(chat_id, text)
+            return
+        
+        user_data = self.users.get(user_id, {})
+        user_coc_tag = user_data.get('coc_tag')
+        
+        if not user_coc_tag:
+            text = "❌ COC tag'iniz kayıtlı değil. **COC** yazarak kayıt olun."
+            self.send_message(chat_id, text)
+            return
+        
+        user_war_status = None
+        for member in war_analysis['member_status']:
+            if member['tag'] == user_coc_tag:
+                user_war_status = member
+                break
+        
+        if not user_war_status:
+            text = "❌ Bu savaşta yer almıyorsunuz."
+            self.send_message(chat_id, text)
+            return
+        
+        remaining_attacks = 2 - user_war_status['attacks_made']
+        
+        text = f"""🎯 **KİŞİSEL HEDEF ÖNERİLERİ**
 
 👤 **{user_war_status['name']}** (#{user_war_status['position']})
 🏰 **TH{user_war_status['th_level']}** | Kalan saldırı: **{remaining_attacks}**
@@ -599,103 +597,101 @@ class AutoClanManager:
 🛡️ Savunma: {user_war_status['defended_stars']} yıldız verildi
 
 🎯 **ÖNERİLEN HEDEFLER:**"""
-       
-       for i, target in enumerate(user_war_status['recommended_targets'], 1):
-           text += f"\n\n**{i}. {target['emoji']} HEDEF:**"
-           text += f"\n• #{target['position']} {target['name']} (TH{target['th_level']})"
-           text += f"\n• TH Farkı: {target['th_difference']:+d}"
-           text += f"\n• Önem: {target['priority'].title()}"
-           text += f"\n• Sebep: {target['reason']}"
-           if target['already_attacked']:
-               text += f"\n• ⚠️ Zaten saldırılmış"
-       
-       # Strateji önerisi
-       if remaining_attacks > 0:
-           priority_target = user_war_status['recommended_targets'][0] if user_war_status['recommended_targets'] else None
-           
-           text += f"\n\n💡 **STRATEJİ ÖNERİSİ:**"
-           
-           if user_war_status['attacks_made'] == 0:
-               text += f"\n🥇 **İLK SALDIRI:** Güvenli hedefle başla"
-               if priority_target:
-                   text += f"\n   → #{priority_target['position']} {priority_target['name']} ideal"
-           elif user_war_status['attacks_made'] == 1:
-               if user_war_status['total_stars'] >= 2:
-                   text += f"\n🥈 **İKİNCİ SALDIRI:** Risk alabilirsin"
-                   text += f"\n   → Daha yüksek hedef dene"
-               else:
-                   text += f"\n🔄 **İKİNCİ SALDIRI:** Güvenli git"
-                   text += f"\n   → Yıldız garantile"
-           
-           text += f"\n\n⏰ **Mevcut Öncelik:** {user_war_status['priority'].title()}"
-       else:
-           text += f"\n\n✅ **Tüm saldırılarını tamamladın!**"
-           if user_war_status['total_stars'] >= 4:
-               text += f"\n🏆 Mükemmel performans!"
-           elif user_war_status['total_stars'] >= 3:
-               text += f"\n👍 İyi iş çıkardın!"
-           else:
-               text += f"\n💪 Bir sonrakinde daha iyi olacak!"
-       
-       self.send_message(chat_id, text)
+        
+        for i, target in enumerate(user_war_status['recommended_targets'], 1):
+            text += f"\n\n**{i}. {target['emoji']} HEDEF:**"
+            text += f"\n• #{target['position']} {target['name']} (TH{target['th_level']})"
+            text += f"\n• TH Farkı: {target['th_difference']:+d}"
+            text += f"\n• Önem: {target['priority'].title()}"
+            text += f"\n• Sebep: {target['reason']}"
+            if target['already_attacked']:
+                text += f"\n• ⚠️ Zaten saldırılmış"
+        
+        if remaining_attacks > 0:
+            priority_target = user_war_status['recommended_targets'][0] if user_war_status['recommended_targets'] else None
+            
+            text += f"\n\n💡 **STRATEJİ ÖNERİSİ:**"
+            
+            if user_war_status['attacks_made'] == 0:
+                text += f"\n🥇 **İLK SALDIRI:** Güvenli hedefle başla"
+                if priority_target:
+                    text += f"\n   → #{priority_target['position']} {priority_target['name']} ideal"
+            elif user_war_status['attacks_made'] == 1:
+                if user_war_status['total_stars'] >= 2:
+                    text += f"\n🥈 **İKİNCİ SALDIRI:** Risk alabilirsin"
+                    text += f"\n   → Daha yüksek hedef dene"
+                else:
+                    text += f"\n🔄 **İKİNCİ SALDIRI:** Güvenli git"
+                    text += f"\n   → Yıldız garantile"
+            
+            text += f"\n\n⏰ **Mevcut Öncelik:** {user_war_status['priority'].title()}"
+        else:
+            text += f"\n\n✅ **Tüm saldırılarını tamamladın!**"
+            if user_war_status['total_stars'] >= 4:
+                text += f"\n🏆 Mükemmel performans!"
+            elif user_war_status['total_stars'] >= 3:
+                text += f"\n👍 İyi iş çıkardın!"
+            else:
+                text += f"\n💪 Bir sonrakinde daha iyi olacak!"
+        
+        self.send_message(chat_id, text)
 
-   def handle_savastakla_command(self, message):
-       """SAVASTAKLA komutu - Savaş stratejisi ve takım analizi"""
-       chat_id = message['chat']['id']
-       user_id = str(message['from']['id'])
-       
-       if user_id not in ADMIN_USERS:
-           text = "❌ Bu komut sadece adminler için!"
-           self.send_message(chat_id, text)
-           return
-       
-       war_analysis = self.get_war_analysis()
-       
-       if not war_analysis:
-           text = "❌ Şu anda savaşta değiliz."
-           self.send_message(chat_id, text)
-           return
-       
-       strategy = war_analysis['recommended_strategy']
-       member_status = war_analysis['member_status']
-       
-       # Saldırı yapmayan üyeler
-       not_attacked = [m for m in member_status if m['attacks_made'] == 0]
-       partial_attacks = [m for m in member_status if m['attacks_made'] == 1]
-       
-       text = f"""🎯 **SAVAS STRATEJİSİ VE TAKTİK**
+    def handle_savastakla_command(self, message):
+        """SAVASTAKLA komutu - Savaş stratejisi ve takım analizi"""
+        chat_id = message['chat']['id']
+        user_id = str(message['from']['id'])
+        
+        if user_id not in ADMIN_USERS:
+            text = "❌ Bu komut sadece adminler için!"
+            self.send_message(chat_id, text)
+            return
+        
+        war_analysis = self.get_war_analysis()
+        
+        if not war_analysis:
+            text = "❌ Şu anda savaşta değiliz."
+            self.send_message(chat_id, text)
+            return
+        
+        strategy = war_analysis['recommended_strategy']
+        member_status = war_analysis['member_status']
+        
+        not_attacked = [m for m in member_status if m['attacks_made'] == 0]
+        partial_attacks = [m for m in member_status if m['attacks_made'] == 1]
+        
+        text = f"""🎯 **SAVAS STRATEJİSİ VE TAKTİK**
 
 🛡️ **Ana Yaklaşım:** {strategy['main_approach'].title()}
 
 📋 **Öncelikli Aksiyonlar:**"""
-       
-       for action in strategy['priority_actions']:
-           text += f"\n• {action}"
-       
-       if strategy['warnings']:
-           text += f"\n\n⚠️ **Uyarılar:**"
-           for warning in strategy['warnings']:
-               text += f"\n• {warning}"
-       
-       text += f"\n\n🎯 **SALDIRI DURUMU:**"
-       text += f"\n• Hiç saldırmadı: {len(not_attacked)} üye"
-       text += f"\n• 1 saldırı yaptı: {len(partial_attacks)} üye"
-       
-       if not_attacked:
-           text += f"\n\n❌ **SALDIRI YAPMAYAN ÜYELER:**"
-           for member in not_attacked[:5]:
-               text += f"\n• {member['name']} (#{member['position']}) - TH{member['th_level']}"
-       
-       # En yüksek öncelikli üyeler
-       high_priority = [m for m in member_status if m['priority'] == 'high' and m['attacks_made'] < 2]
-       if high_priority:
-           text += f"\n\n🔥 **ÖNCELİKLİ SALDIRMASI GEREKENLER:**"
-           for member in high_priority[:5]:
-               remaining = 2 - member['attacks_made']
-               text += f"\n• {member['name']} (#{member['position']}) - {remaining} saldırı kaldı"
-       
-       self.send_message(chat_id, text)
         
+        for action in strategy['priority_actions']:
+            text += f"\n• {action}"
+        
+        if strategy['warnings']:
+            text += f"\n\n⚠️ **Uyarılar:**"
+            for warning in strategy['warnings']:
+                text += f"\n• {warning}"
+        
+        text += f"\n\n🎯 **SALDIRI DURUMU:**"
+        text += f"\n• Hiç saldırmadı: {len(not_attacked)} üye"
+        text += f"\n• 1 saldırı yaptı: {len(partial_attacks)} üye"
+        
+        if not_attacked:
+            text += f"\n\n❌ **SALDIRI YAPMAYAN ÜYELER:**"
+            for member in not_attacked[:5]:
+                text += f"\n• {member['name']} (#{member['position']}) - TH{member['th_level']}"
+        
+        high_priority = [m for m in member_status if m['priority'] == 'high' and m['attacks_made'] < 2]
+        if high_priority:
+            text += f"\n\n🔥 **ÖNCELİKLİ SALDIRMASI GEREKENLER:**"
+            for member in high_priority[:5]:
+                remaining = 2 - member['attacks_made']
+                text += f"\n• {member['name']} (#{member['position']}) - {remaining} saldırı kaldı"
+        
+        self.send_message(chat_id, text)
+
+       
         # AWS Lambda'da otomatik monitoring'i başlatma (event-driven)
         if not RUNNING_ON_AWS:
             self.start_auto_clan_monitoring()
