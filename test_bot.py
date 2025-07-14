@@ -1106,7 +1106,7 @@ Hoş geldin {first_name}! ⚔️
         self.send_message(chat_id, text)
         self.save_data()
     
-  def get_clan_summary(self):
+def get_clan_summary(self):
     """Klan özeti hazırla"""
     analysis = self.get_latest_clan_analysis()
     
@@ -1122,18 +1122,18 @@ Hoş geldin {first_name}! ⚔️
     time_ago = datetime.now() - last_update
     hours_ago = int(time_ago.total_seconds() / 3600)
     
-    summary_text = **Klan Durumu:**
-🏰 {clan_info['name']} (Seviye {clan_info['level']})
-👥 Üye: {clan_info['members']}/50
-🏆 Klan Puanı: {clan_info['total_points']:,}
-⚔️ Savaş: {clan_info['war_wins']}W-{clan_info['war_losses']}L
+    summary_text = f"""**Klan Durumu:**
+{clan_info['name']} (Seviye {clan_info['level']})
+- Üye: {clan_info['members']}/50
+- Klan Puanı: {clan_info['total_points']:,}
+- Savaş: {clan_info['war_wins']}W-{clan_info['war_losses']}L
 
-🎯 **Analiz Sonuçları:**
-👑 En iyi performans: {top_count} üye
-⚠️ Pasif üye: {inactive_count} üye  
-🔄 Rütbe önerisi: {role_changes} üye
+**Analiz Sonuçları:**
+- En iyi performans: {top_count} üye
+- Pasif üye: {inactive_count} üye  
+- Rütbe önerisi: {role_changes} üye
 
-🕐 Son analiz: {hours_ago} saat önce"""
+Son analiz: {hours_ago} saat önce"""
     
     return summary_text
     
