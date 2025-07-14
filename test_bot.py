@@ -735,6 +735,7 @@ class AutoClanManager:
                 'aws_mode': RUNNING_ON_AWS,
                 'version': '2.1'
             }
+        }
         
         try:
             # AWS'de /tmp dizini kullan
