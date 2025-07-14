@@ -1160,7 +1160,7 @@ Son analiz: {hours_ago} saat önce"""
             elif war_data.get('state') == 'warEnded':
                 war_status = "✅ Savaş bitti"
         
-        text = f"""🏰 **{clan_data['name']} - Canlı Durum**
+        text = **{clan_data['name']} - Canlı Durum**
 
 👥 **Üye Bilgileri:**
 • Toplam üye: {clan_data['members']}/50
