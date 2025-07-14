@@ -100,6 +100,601 @@ class AutoClanManager:
         
         # İlk klan analizi
         self.analyze_clan()
+
+        # ==================== SAVAS ANALİZ FONKSİYONLARI ====================
+    
+    def get_war_analysis(self):
+        """Detaylı savaş analizi ve eşleştirme değerlendirmesi"""
+        war_data = self.get_clan_war_data()
+        
+        if not war_data or war_data.get('state') == 'notInWar':
+            return None
+        
+        our_clan = war_data.get('clan', {})
+        enemy_clan = war_data.get('opponent', {})
+        
+        analysis = {
+            'war_state': war_data.get('state'),
+            'preparation_start': war_data.get('preparationStartTime'),
+            'start_time': war_data.get('startTime'),
+            'end_time': war_data.get('endTime'),
+            'team_size': war_data.get('teamSize'),
+            'our_clan': {
+                'name': our_clan.get('name'),
+                'tag': our_clan.get('tag'),
+                'level': our_clan.get('clanLevel'),
+                'stars': our_clan.get('stars', 0),
+                'destruction': our_clan.get('destructionPercentage', 0),
+                'attacks_used': our_clan.get('attacksUsed', 0),
+                'attacks_remaining': (war_data.get('teamSize', 0) * 2) - our_clan.get('attacksUsed', 0)
+            },
+            'enemy_clan': {
+                'name': enemy_clan.get('name'),
+                'tag': enemy_clan.get('tag'),
+                'level': enemy_clan.get('clanLevel'),
+                'stars': enemy_clan.get('stars', 0),
+                'destruction': enemy_clan.get('destructionPercentage', 0),
+                'attacks_used': enemy_clan.get('attacksUsed', 0)
+            },
+            'matchup_analysis': self.analyze_war_matchup(our_clan, enemy_clan),
+            'member_status': self.analyze_war_members(our_clan, enemy_clan),
+            'recommended_strategy': None
+        }
+        
+        # Strateji önerisi
+        analysis['recommended_strategy'] = self.generate_war_strategy(analysis)
+        
+        return analysis
+
+    def analyze_war_matchup(self, our_clan, enemy_clan):
+        """Savaş eşleştirmesi analizi - rakip klan güçlü mü?"""
+        our_members = our_clan.get('members', [])
+        enemy_members = enemy_clan.get('members', [])
+        
+        if not our_members or not enemy_members:
+            return {'status': 'unknown', 'details': 'Üye bilgileri bulunamadı'}
+        
+        # Güç karşılaştırması
+        our_total_th = sum(member.get('townhallLevel', 0) for member in our_members)
+        enemy_total_th = sum(member.get('townhallLevel', 0) for member in enemy_members)
+        
+        our_avg_th = our_total_th / len(our_members)
+        enemy_avg_th = enemy_total_th / len(enemy_members)
+        
+        # TH dağılımı analizi
+        our_th_distribution = {}
+        enemy_th_distribution = {}
+        
+        for member in our_members:
+            th_level = member.get('townhallLevel', 0)
+            our_th_distribution[th_level] = our_th_distribution.get(th_level, 0) + 1
+        
+        for member in enemy_members:
+            th_level = member.get('townhallLevel', 0)
+            enemy_th_distribution[th_level] = enemy_th_distribution.get(th_level, 0) + 1
+        
+        # Güç değerlendirmesi
+        th_difference = enemy_avg_th - our_avg_th
+        
+        if th_difference > 0.5:
+            strength_status = 'enemy_stronger'
+            strength_emoji = '🔴'
+            strength_text = 'Rakip daha güçlü'
+        elif th_difference < -0.5:
+            strength_status = 'we_stronger'
+            strength_emoji = '🟢'
+            strength_text = 'Bizim avantajımız var'
+        else:
+            strength_status = 'balanced'
+            strength_emoji = '🟡'
+            strength_text = 'Dengeli eşleşme'
+        
+        # En güçlü üyeler karşılaştırması
+        our_top3 = sorted(our_members, key=lambda x: x.get('townhallLevel', 0), reverse=True)[:3]
+        enemy_top3 = sorted(enemy_members, key=lambda x: x.get('townhallLevel', 0), reverse=True)[:3]
+        
+        return {
+            'status': strength_status,
+            'emoji': strength_emoji,
+            'description': strength_text,
+            'our_avg_th': round(our_avg_th, 1),
+            'enemy_avg_th': round(enemy_avg_th, 1),
+            'th_difference': round(th_difference, 1),
+            'our_th_distribution': our_th_distribution,
+            'enemy_th_distribution': enemy_th_distribution,
+            'our_top3': [{'name': m.get('name'), 'th': m.get('townhallLevel')} for m in our_top3],
+            'enemy_top3': [{'name': m.get('name'), 'th': m.get('townhallLevel')} for m in enemy_top3]
+        }
+
+    def analyze_war_members(self, our_clan, enemy_clan):
+        """Savaş üye durumu ve atama analizi"""
+        our_members = our_clan.get('members', [])
+        enemy_members = enemy_clan.get('members', [])
+        
+        member_analysis = []
+        
+        for i, member in enumerate(our_members, 1):
+            attacks = member.get('attacks', [])
+            best_attack = member.get('bestOpponentAttack')
+            
+            # Karşı üye analizi
+            if i <= len(enemy_members):
+                opponent = enemy_members[i-1]
+                opponent_attacks = opponent.get('attacks', [])
+                
+                # Saldırı durumu
+                attack_status = 'not_attacked'
+                total_stars = 0
+                total_destruction = 0
+                
+                if attacks:
+                    attack_status = 'attacked'
+                    total_stars = sum(attack.get('stars', 0) for attack in attacks)
+                    total_destruction = sum(attack.get('destructionPercentage', 0) for attack in attacks)
+                
+                # Savunma durumu
+                defense_status = 'not_defended'
+                defended_stars = 0
+                defended_destruction = 0
+                
+                if best_attack:
+                    defense_status = 'defended'
+                    defended_stars = best_attack.get('stars', 0)
+                    defended_destruction = best_attack.get('destructionPercentage', 0)
+                
+                # Hedef önerisi
+                recommended_targets = self.suggest_targets_for_member(member, enemy_members, our_members)
+                
+                member_analysis.append({
+                    'position': i,
+                    'name': member.get('name'),
+                    'tag': member.get('tag'),
+                    'th_level': member.get('townhallLevel'),
+                    'attack_status': attack_status,
+                    'attacks_made': len(attacks),
+                    'total_stars': total_stars,
+                    'total_destruction': round(total_destruction, 1),
+                    'defense_status': defense_status,
+                    'defended_stars': defended_stars,
+                    'defended_destruction': round(defended_destruction, 1),
+                    'opponent': {
+                        'name': opponent.get('name'),
+                        'th_level': opponent.get('townhallLevel'),
+                        'attacks_made': len(opponent_attacks)
+                    },
+                    'recommended_targets': recommended_targets,
+                    'priority': self.calculate_member_priority(member, attacks, best_attack)
+                })
+        
+        return member_analysis
+
+    def suggest_targets_for_member(self, member, enemy_members, our_members):
+        """Üye için hedef önerisi algoritması"""
+        member_th = member.get('townhallLevel', 0)
+        member_position = None
+        
+        # Üyenin pozisyonunu bul
+        for i, our_member in enumerate(our_members, 1):
+            if our_member.get('tag') == member.get('tag'):
+                member_position = i
+                break
+        
+        suggestions = []
+        
+        for i, enemy in enumerate(enemy_members, 1):
+            enemy_th = enemy.get('townhallLevel', 0)
+            enemy_attacks = enemy.get('attacks', [])
+            
+            # Hedef analizi
+            th_difference = member_th - enemy_th
+            
+            # Skor hesaplama
+            score = 50  # Base score
+            
+            # TH seviyesi bonus/malus
+            if th_difference >= 0:
+                score += min(th_difference * 20, 40)  # Aynı veya düşük TH bonus
+            else:
+                score -= abs(th_difference) * 15  # Yüksek TH cezası
+            
+            # Pozisyon uygunluğu
+            position_diff = abs(member_position - i) if member_position else 0
+            if position_diff <= 2:
+                score += 20  # Kendi seviyesi civarı bonus
+            elif position_diff <= 5:
+                score += 10
+            
+            # Zaten saldırılmış mı kontrolü
+            attacked_by_us = False
+            for our_member in our_members:
+                for attack in our_member.get('attacks', []):
+                    if attack.get('defenderTag') == enemy.get('tag'):
+                        attacked_by_us = True
+                        break
+            
+            if attacked_by_us:
+                score -= 30  # Zaten saldırılmış ceza
+            
+            # Düşman saldırı sayısı (savunmasız hedefler tercih)
+            if len(enemy_attacks) == 0:
+                score += 15  # Henüz saldırmamış bonus
+            
+            # Öncelik belirleme
+            if score >= 80:
+                priority = 'high'
+                priority_emoji = '🎯'
+            elif score >= 60:
+                priority = 'medium'
+                priority_emoji = '⚡'
+            elif score >= 40:
+                priority = 'low'
+                priority_emoji = '💫'
+            else:
+                priority = 'avoid'
+                priority_emoji = '❌'
+            
+            suggestions.append({
+                'position': i,
+                'name': enemy.get('name'),
+                'th_level': enemy_th,
+                'score': round(score),
+                'priority': priority,
+                'emoji': priority_emoji,
+                'th_difference': th_difference,
+                'already_attacked': attacked_by_us,
+                'reason': self.get_target_reason(th_difference, position_diff, attacked_by_us, score)
+            })
+        
+        # En iyi 3 hedefi döndür
+        suggestions.sort(key=lambda x: x['score'], reverse=True)
+        return suggestions[:3]
+
+    def get_target_reason(self, th_diff, pos_diff, attacked, score):
+        """Hedef önerisi sebebi"""
+        if attacked:
+            return "Zaten saldırılmış"
+        elif th_diff >= 1:
+            return "Kolay hedef"
+        elif th_diff == 0:
+            return "Eşit seviye"
+        elif th_diff == -1:
+            return "Zorlayıcı ama yapılabilir"
+        elif pos_diff <= 2:
+            return "Pozisyon uygun"
+        elif score >= 70:
+            return "Güvenli seçim"
+        else:
+            return "Risk'li hedef"
+
+    def calculate_member_priority(self, member, attacks, best_defense):
+        """Üye öncelik hesaplama"""
+        priority_score = 0
+        
+        # Saldırı durumu
+        if len(attacks) == 0:
+            priority_score += 50  # Henüz saldırmamış - yüksek öncelik
+        elif len(attacks) == 1:
+            attack = attacks[0]
+            if attack.get('stars', 0) < 2:
+                priority_score += 30  # Kötü ilk saldırı - tekrar denemeli
+            else:
+                priority_score += 10  # İyi saldırı - ikinci saldırı için orta öncelik
+        
+        # TH seviyesi
+        th_level = member.get('townhallLevel', 0)
+        if th_level >= 12:
+            priority_score += 20  # Yüksek TH - stratejik önemli
+        
+        # Savunma durumu
+        if best_defense:
+            defended_stars = best_defense.get('stars', 0)
+            if defended_stars >= 2:
+                priority_score -= 20  # İyi savunmuş - düşük öncelik
+        
+        return 'high' if priority_score >= 60 else 'medium' if priority_score >= 30 else 'low'
+
+    def generate_war_strategy(self, war_analysis):
+        """Savaş stratejisi önerisi"""
+        matchup = war_analysis['matchup_analysis']
+        our_clan = war_analysis['our_clan']
+        enemy_clan = war_analysis['enemy_clan']
+        
+        strategy = {
+            'main_approach': '',
+            'priority_actions': [],
+            'warnings': [],
+            'timeline': []
+        }
+        
+        # Ana strateji belirleme
+        if matchup['status'] == 'enemy_stronger':
+            strategy['main_approach'] = 'defensive'
+            strategy['priority_actions'] = [
+                '🛡️ Savunmaya odaklan - güvenli hedefleri seç',
+                '⭐ 2 yıldız stratejisi uygula',
+                '🎯 Alt sıralarda güvenli puanları topla',
+                '⚡ En güçlü üyeler üst sıraları temizlesin'
+            ]
+        elif matchup['status'] == 'we_stronger':
+            strategy['main_approach'] = 'aggressive'
+            strategy['priority_actions'] = [
+                '🚀 Saldırgan git - 3 yıldız hedefle',
+                '👑 Üst sıralar maksimum yıldız alsın',
+                '🔥 Hızlı temizlik stratejisi',
+                '💯 %100 hakim olma hedefi'
+            ]
+        else:
+            strategy['main_approach'] = 'balanced'
+            strategy['priority_actions'] = [
+                '⚖️ Dengeli strateji - güvenli puanlar önce',
+                '🎯 Kendi seviyende saldır',
+                '⭐ 2 yıldız garantile, 3 yıldız dene',
+                '🔄 Esnek takım çalışması'
+            ]
+        
+        # Uyarılar
+        remaining_attacks = our_clan['attacks_remaining']
+        if remaining_attacks <= 5:
+            strategy['warnings'].append('⚠️ Az saldırı hakkı kaldı - dikkatli ol!')
+        
+        if our_clan['stars'] < enemy_clan['stars']:
+            strategy['warnings'].append('🔴 Gerideyiz - agresif strateji gerekli!')
+        
+        # Zaman çizelgesi
+        war_state = war_analysis['war_state']
+        if war_state == 'preparation':
+            strategy['timeline'] = [
+                '📋 Strateji toplantısı yap',
+                '🎯 Hedef atamaları belirle',
+                '💪 Ordu hazırlığı kontrol et',
+                '⏰ Savaş başlangıcında hazır ol'
+            ]
+        elif war_state == 'inWar':
+            strategy['timeline'] = [
+                '🚀 İlk saldırıları başlat',
+                '📊 İlk sonuçları değerlendir',
+                '🔄 Gerekirse strateji güncelle',
+                '⚡ Cleanup saldırıları organize et'
+            ]
+        
+        return strategy
+
+    def monitor_war_status(self):
+        """Savaş durumunu izle ve otomatik bildirimler gönder"""
+        try:
+            war_data = self.get_clan_war_data()
+            
+            if not war_data:
+                return
+            
+            war_state = war_data.get('state')
+            current_time = datetime.now()
+            
+            # Savaş başlangıcı bildirimi
+            if war_state == 'inWar':
+                start_time_str = war_data.get('startTime', '')
+                if start_time_str:
+                    try:
+                        start_time = datetime.fromisoformat(start_time_str.replace('Z', '+00:00'))
+                        if (current_time - start_time).total_seconds() < 3600:  # İlk 1 saat
+                            print(f"🚨 Savaş başladı: {war_data.get('opponent', {}).get('name', 'Bilinmiyor')}")
+                    except:
+                        pass
+            
+            # Savaş sonu bildirimi
+            elif war_state == 'warEnded':
+                # Otomatik performans raporu oluştur ve kaydet
+                timestamp = datetime.now().isoformat()
+                if 'war_reports' not in self.clan_history:
+                    self.clan_history['war_reports'] = {}
+                
+                self.clan_history['war_reports'][timestamp] = {
+                    'end_time': timestamp,
+                    'opponent': war_data.get('opponent', {}).get('name', 'Bilinmiyor'),
+                    'our_stars': war_data.get('clan', {}).get('stars', 0),
+                    'enemy_stars': war_data.get('opponent', {}).get('stars', 0)
+                }
+                self.save_data()
+                
+        except Exception as e:
+            print(f"⚠️ Savaş izleme hatası: {e}")
+
+        def handle_savas_command(self, message):
+       """SAVAS komutu - Güncel savaş durumu"""
+       chat_id = message['chat']['id']
+       
+       war_analysis = self.get_war_analysis()
+       
+       if not war_analysis:
+           text = "🏰 **Şu anda savaşta değiliz**\n\n⏳ Savaş arama veya hazırlık aşamasında olabilirsiniz."
+           self.send_message(chat_id, text)
+           return
+       
+       war_state = war_analysis['war_state']
+       our_clan = war_analysis['our_clan']
+       enemy_clan = war_analysis['enemy_clan']
+       matchup = war_analysis['matchup_analysis']
+       
+       if war_state == 'preparation':
+           status_emoji = '⏳'
+           status_text = 'Hazırlık Aşaması'
+       elif war_state == 'inWar':
+           status_emoji = '⚔️'
+           status_text = 'Savaş Devam Ediyor'
+       else:
+           status_emoji = '✅'
+           status_text = 'Savaş Bitti'
+       
+       text = f"""⚔️ **SAVAS DURUMU**
+
+{status_emoji} **{status_text}**
+🆚 **{our_clan['name']}** vs **{enemy_clan['name']}**
+
+🏰 **Klan Karşılaştırması:**
+- Bizim takım: Seviye {our_clan['level']} | {war_analysis['team_size']} kişi
+- Rakip takım: Seviye {enemy_clan['level']} | {war_analysis['team_size']} kişi
+
+{matchup['emoji']} **Güç Analizi: {matchup['description']}**
+- Bizim ortalama TH: {matchup['our_avg_th']}
+- Rakip ortalama TH: {matchup['enemy_avg_th']}
+- Fark: {matchup['th_difference']:+.1f}
+
+⭐ **Skor Durumu:**
+- Bizim yıldız: {our_clan['stars']}
+- Rakip yıldız: {enemy_clan['stars']}
+- Bizim hasar: %{our_clan['destruction']}
+- Rakip hasar: %{enemy_clan['destruction']}
+
+🎯 **Saldırı Durumu:**
+- Kullanılan: {our_clan['attacks_used']}
+- Kalan: {our_clan['attacks_remaining']}
+
+**Detaylı analiz:** HEDEFIM komutunu kullanın"""
+       
+       self.send_message(chat_id, text)
+
+   def handle_hedefim_command(self, message):
+       """HEDEFIM komutu - Kişisel hedef önerileri"""
+       chat_id = message['chat']['id']
+       user_id = str(message['from']['id'])
+       
+       war_analysis = self.get_war_analysis()
+       
+       if not war_analysis:
+           text = "❌ Şu anda savaşta değiliz."
+           self.send_message(chat_id, text)
+           return
+       
+       # Kullanıcının savaş durumunu bul
+       user_data = self.users.get(user_id, {})
+       user_coc_tag = user_data.get('coc_tag')
+       
+       if not user_coc_tag:
+           text = "❌ COC tag'iniz kayıtlı değil. **COC** yazarak kayıt olun."
+           self.send_message(chat_id, text)
+           return
+       
+       user_war_status = None
+       for member in war_analysis['member_status']:
+           if member['tag'] == user_coc_tag:
+               user_war_status = member
+               break
+       
+       if not user_war_status:
+           text = "❌ Bu savaşta yer almıyorsunuz."
+           self.send_message(chat_id, text)
+           return
+       
+       remaining_attacks = 2 - user_war_status['attacks_made']
+       
+       text = f"""🎯 **KİŞİSEL HEDEF ÖNERİLERİ**
+
+👤 **{user_war_status['name']}** (#{user_war_status['position']})
+🏰 **TH{user_war_status['th_level']}** | Kalan saldırı: **{remaining_attacks}**
+
+📊 **Mevcut Performansın:**
+⚔️ Saldırı: {user_war_status['attacks_made']}/2
+⭐ Toplam yıldız: {user_war_status['total_stars']}
+💥 Toplam hasar: %{user_war_status['total_destruction']}
+🛡️ Savunma: {user_war_status['defended_stars']} yıldız verildi
+
+🎯 **ÖNERİLEN HEDEFLER:**"""
+       
+       for i, target in enumerate(user_war_status['recommended_targets'], 1):
+           text += f"\n\n**{i}. {target['emoji']} HEDEF:**"
+           text += f"\n• #{target['position']} {target['name']} (TH{target['th_level']})"
+           text += f"\n• TH Farkı: {target['th_difference']:+d}"
+           text += f"\n• Önem: {target['priority'].title()}"
+           text += f"\n• Sebep: {target['reason']}"
+           if target['already_attacked']:
+               text += f"\n• ⚠️ Zaten saldırılmış"
+       
+       # Strateji önerisi
+       if remaining_attacks > 0:
+           priority_target = user_war_status['recommended_targets'][0] if user_war_status['recommended_targets'] else None
+           
+           text += f"\n\n💡 **STRATEJİ ÖNERİSİ:**"
+           
+           if user_war_status['attacks_made'] == 0:
+               text += f"\n🥇 **İLK SALDIRI:** Güvenli hedefle başla"
+               if priority_target:
+                   text += f"\n   → #{priority_target['position']} {priority_target['name']} ideal"
+           elif user_war_status['attacks_made'] == 1:
+               if user_war_status['total_stars'] >= 2:
+                   text += f"\n🥈 **İKİNCİ SALDIRI:** Risk alabilirsin"
+                   text += f"\n   → Daha yüksek hedef dene"
+               else:
+                   text += f"\n🔄 **İKİNCİ SALDIRI:** Güvenli git"
+                   text += f"\n   → Yıldız garantile"
+           
+           text += f"\n\n⏰ **Mevcut Öncelik:** {user_war_status['priority'].title()}"
+       else:
+           text += f"\n\n✅ **Tüm saldırılarını tamamladın!**"
+           if user_war_status['total_stars'] >= 4:
+               text += f"\n🏆 Mükemmel performans!"
+           elif user_war_status['total_stars'] >= 3:
+               text += f"\n👍 İyi iş çıkardın!"
+           else:
+               text += f"\n💪 Bir sonrakinde daha iyi olacak!"
+       
+       self.send_message(chat_id, text)
+
+   def handle_savastakla_command(self, message):
+       """SAVASTAKLA komutu - Savaş stratejisi ve takım analizi"""
+       chat_id = message['chat']['id']
+       user_id = str(message['from']['id'])
+       
+       if user_id not in ADMIN_USERS:
+           text = "❌ Bu komut sadece adminler için!"
+           self.send_message(chat_id, text)
+           return
+       
+       war_analysis = self.get_war_analysis()
+       
+       if not war_analysis:
+           text = "❌ Şu anda savaşta değiliz."
+           self.send_message(chat_id, text)
+           return
+       
+       strategy = war_analysis['recommended_strategy']
+       member_status = war_analysis['member_status']
+       
+       # Saldırı yapmayan üyeler
+       not_attacked = [m for m in member_status if m['attacks_made'] == 0]
+       partial_attacks = [m for m in member_status if m['attacks_made'] == 1]
+       
+       text = f"""🎯 **SAVAS STRATEJİSİ VE TAKTİK**
+
+🛡️ **Ana Yaklaşım:** {strategy['main_approach'].title()}
+
+📋 **Öncelikli Aksiyonlar:**"""
+       
+       for action in strategy['priority_actions']:
+           text += f"\n• {action}"
+       
+       if strategy['warnings']:
+           text += f"\n\n⚠️ **Uyarılar:**"
+           for warning in strategy['warnings']:
+               text += f"\n• {warning}"
+       
+       text += f"\n\n🎯 **SALDIRI DURUMU:**"
+       text += f"\n• Hiç saldırmadı: {len(not_attacked)} üye"
+       text += f"\n• 1 saldırı yaptı: {len(partial_attacks)} üye"
+       
+       if not_attacked:
+           text += f"\n\n❌ **SALDIRI YAPMAYAN ÜYELER:**"
+           for member in not_attacked[:5]:
+               text += f"\n• {member['name']} (#{member['position']}) - TH{member['th_level']}"
+       
+       # En yüksek öncelikli üyeler
+       high_priority = [m for m in member_status if m['priority'] == 'high' and m['attacks_made'] < 2]
+       if high_priority:
+           text += f"\n\n🔥 **ÖNCELİKLİ SALDIRMASI GEREKENLER:**"
+           for member in high_priority[:5]:
+               remaining = 2 - member['attacks_made']
+               text += f"\n• {member['name']} (#{member['position']}) - {remaining} saldırı kaldı"
+       
+       self.send_message(chat_id, text)
         
         # AWS Lambda'da otomatik monitoring'i başlatma (event-driven)
         if not RUNNING_ON_AWS:
@@ -144,7 +739,6 @@ class AutoClanManager:
                 'aws_mode': RUNNING_ON_AWS,
                 'version': '2.1'
             }
-        }
         
         try:
             # AWS'de /tmp dizini kullan
@@ -400,6 +994,7 @@ export COC_API_TOKEN="yeni_token_buraya"
                 try:
                     print("🔄 Otomatik klan kontrolü...")
                     self.analyze_clan()
+                    self.monitor_war_status()
                     print("💤 Bir sonraki kontrol 1 saat sonra...")
                     time.sleep(3600)  # 1 saat bekle
                 except Exception as e:
@@ -506,6 +1101,10 @@ Hoş geldin {first_name}! ⚔️
 • **PASIF** - Pasif üyeler
 • **STATS** - Kişisel istatistik
 • **IPCHECK** - IP kontrol (admin)"""
+🎯 **Savaş Komutları:**
+- **SAVAS** - Güncel savaş durumu ve analiz
+- **HEDEFIM** - Kişisel hedef önerileri  
+- **SAVASTAKLA** - Detaylı strateji (Admin)
         
         self.send_message(chat_id, text)
         self.save_data()
@@ -858,6 +1457,12 @@ python3 clash_bot.py
             self.handle_stats_command(message)
         elif text == 'IPCHECK':
             self.handle_ipcheck_command(message)
+        elif text == 'SAVAS':
+            self.handle_savas_command(message)
+        elif text == 'HEDEFIM':
+            self.handle_hedefim_command(message)
+        elif text == 'SAVASTAKLA':
+            self.handle_savastakla_command(message)
         elif text == 'COC':
             self.send_message(chat_id, "🏰 **COC Tag'inizi yazın:**\n📋 Örnek: #ABC123XYZ")
         elif text.startswith('#') and len(text) >= 4:
