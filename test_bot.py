@@ -1163,7 +1163,7 @@ Son analiz: {hours_ago} saat önce"""
         
         text = **{clan_data['name']} - Canlı Durum**
 
-👥 **Üye Bilgileri:**
+ **Üye Bilgileri:**
 • Toplam üye: {clan_data['members']}/50
 • Klan seviyesi: {clan_data['clanLevel']}
 • Klan puanı: {clan_data['clanPoints']:,}
