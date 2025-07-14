@@ -500,8 +500,8 @@ class AutoClanManager:
             print(f"⚠️ Savaş izleme hatası: {e}")
 
         def handle_savas_command(self, message):
-       """SAVAS komutu - Güncel savaş durumu"""
-       chat_id = message['chat']['id']
+           """SAVAS komutu - Güncel savaş durumu"""
+           chat_id = message['chat']['id']
        
        war_analysis = self.get_war_analysis()
        
