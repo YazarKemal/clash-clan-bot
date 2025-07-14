@@ -1105,23 +1105,23 @@ Hoş geldin {first_name}! ⚔️
         self.send_message(chat_id, text)
         self.save_data()
     
-    def get_clan_summary(self):
-        """Klan özeti hazırla"""
-        analysis = self.get_latest_clan_analysis()
-        
-        if not analysis:
-            return "📊 **Klan Durumu:** İlk analiz yapılıyor..."
-        
-        clan_info = analysis['clan_info']
-        inactive_count = len(analysis['inactive_members'])
-        top_count = len(analysis['top_performers'])
-        role_changes = len(analysis['role_recommendations'])
-        
-        last_update = datetime.fromisoformat(analysis['timestamp'])
-        time_ago = datetime.now() - last_update
-        hours_ago = int(time_ago.total_seconds() / 3600)
-        
-        return f"""📊 **Klan Durumu:**
+  def get_clan_summary(self):
+    """Klan özeti hazırla"""
+    analysis = self.get_latest_clan_analysis()
+    
+    if not analysis:
+        return "📊 **Klan Durumu:** İlk analiz yapılıyor..."
+    
+    clan_info = analysis['clan_info']
+    inactive_count = len(analysis['inactive_members'])
+    top_count = len(analysis['top_performers'])
+    role_changes = len(analysis['role_recommendations'])
+    
+    last_update = datetime.fromisoformat(analysis['timestamp'])
+    time_ago = datetime.now() - last_update
+    hours_ago = int(time_ago.total_seconds() / 3600)
+    
+    summary_text = f"""📊 **Klan Durumu:**
 🏰 {clan_info['name']} (Seviye {clan_info['level']})
 👥 Üye: {clan_info['members']}/50
 🏆 Klan Puanı: {clan_info['total_points']:,}
@@ -1133,6 +1133,8 @@ Hoş geldin {first_name}! ⚔️
 🔄 Rütbe önerisi: {role_changes} üye
 
 🕐 Son analiz: {hours_ago} saat önce"""
+    
+    return summary_text
     
     def handle_klan_command(self, message):
         """KLAN komutu - Canlı klan durumu"""
